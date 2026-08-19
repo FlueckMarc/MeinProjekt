@@ -24,6 +24,7 @@ st.set_page_config(
 SECRET_PASSWORD = "viper01"
 DATA_FILE = "vermoegensdaten.csv"
 
+# Vermögensziele
 ZIELVERMOEGEN = 1_000_000
 ZIEL_FREIES_VERMOEGEN = 750_000
 
@@ -34,7 +35,8 @@ ZIEL_FREIES_VERMOEGEN = 750_000
 
 def format_chf(value):
     """
-    Schweizer Zahlenformat:
+    Schweizer Zahlenformat
+    Beispiel:
     981000 -> 981'000 CHF
     """
     return f"{value:,.0f}".replace(",", "'") + " CHF"
@@ -42,7 +44,8 @@ def format_chf(value):
 
 def format_change(value):
     """
-    Schweizer Zahlenformat mit Vorzeichen:
+    Schweizer Zahlenformat mit Vorzeichen
+    Beispiel:
     30000 -> +30'000 CHF
     -30000 -> -30'000 CHF
     """
@@ -208,7 +211,7 @@ if check_password():
 
 
         # ====================================================
-        # CALCULATE CHANGES
+        # CHANGES VS PREVIOUS ENTRY
         # ====================================================
 
         total_change, total_change_percent = calculate_change(
@@ -292,6 +295,206 @@ if check_password():
                 value=latest_entry["Datum"].strftime(
                     "%d.%m.%Y"
                 )
+            )
+
+
+        # ====================================================
+        # YEAR-TO-DATE BERECHNUNG
+        # ====================================================
+
+        current_year = latest_entry["Datum"].year
+
+        df_current_year = df_history[
+            df_history["Datum"].dt.year == current_year
+        ].copy()
+
+
+        # Gesamtvermögen für jedes Datum berechnen
+
+        df_current_year["Gesamtvermoegen"] = (
+            df_current_year["Liquide_Mittel"]
+            + df_current_year["Sparvermoegen"]
+            + df_current_year["Boerse"]
+            + df_current_year["Private_Vorsorge"]
+            + df_current_year["LPP"]
+        )
+
+
+        # Erster Eintrag des aktuellen Jahres
+
+        first_year_entry = df_current_year.iloc[0]
+
+        year_start_assets = (
+            first_year_entry["Gesamtvermoegen"]
+        )
+
+
+        # Veränderung seit Jahresbeginn
+
+        ytd_change = (
+            total_assets
+            - year_start_assets
+        )
+
+
+        # Prozentuale Veränderung
+
+        if year_start_assets != 0:
+
+            ytd_percent = (
+                ytd_change
+                / year_start_assets
+            ) * 100
+
+        else:
+
+            ytd_percent = 0
+
+
+        # ====================================================
+        # YEAR-TO-DATE ANZEIGE
+        # ====================================================
+
+        st.markdown(
+            f"### 📅 Entwicklung {current_year}"
+        )
+
+
+        ytd_col1, ytd_col2, ytd_col3 = st.columns(3)
+
+
+        # Veränderung
+
+        with ytd_col1:
+
+            st.metric(
+                label="📈 Veränderung seit Jahresbeginn",
+                value=format_chf(ytd_change),
+                delta=f"{ytd_percent:+.2f}%"
+            )
+
+
+        # Jahresanfang
+
+        with ytd_col2:
+
+            st.metric(
+                label="📅 Vermögen am Jahresanfang",
+                value=format_chf(
+                    year_start_assets
+                )
+            )
+
+
+        # Aktuell
+
+        with ytd_col3:
+
+            st.metric(
+                label="💰 Aktuelles Vermögen",
+                value=format_chf(
+                    total_assets
+                )
+            )
+
+
+        # ====================================================
+        # YTD GRAPH
+        # ====================================================
+
+        st.markdown(
+            f"#### 📊 Gesamtvermögen seit 1. Januar {current_year}"
+        )
+
+
+        fig_ytd = go.Figure()
+
+
+        fig_ytd.add_trace(
+            go.Scatter(
+                x=df_current_year["Datum"],
+                y=df_current_year["Gesamtvermoegen"],
+                mode="lines+markers",
+                name="Gesamtvermögen",
+                line=dict(
+                    width=4,
+                    color="#16a34a"
+                ),
+                marker=dict(
+                    size=8
+                ),
+                hovertemplate=
+                    "%{x|%d.%m.%Y}<br>"
+                    + "Gesamtvermögen: %{y:,.0f} CHF"
+                    + "<extra></extra>"
+            )
+        )
+
+
+        # Jahresstart-Linie
+
+        fig_ytd.add_hline(
+            y=year_start_assets,
+            line_dash="dash",
+            line_color="#64748b",
+            annotation_text=(
+                f"Jahresbeginn: "
+                f"{year_start_assets:,.0f} CHF"
+            ),
+            annotation_position="top left"
+        )
+
+
+        fig_ytd.update_layout(
+
+            yaxis_title="CHF",
+
+            xaxis_title="",
+
+            hovermode="x unified",
+
+            margin=dict(
+                t=30,
+                b=20,
+                l=20,
+                r=20
+            ),
+
+            showlegend=False
+        )
+
+
+        st.plotly_chart(
+            fig_ytd,
+            use_container_width=True
+        )
+
+
+        # ====================================================
+        # YTD ZUSAMMENFASSUNG
+        # ====================================================
+
+        if ytd_change > 0:
+
+            st.success(
+                f"📈 Dein Gesamtvermögen ist seit "
+                f"Jahresbeginn um **{format_chf(ytd_change)}** "
+                f"bzw. **{ytd_percent:+.2f}%** gestiegen."
+            )
+
+        elif ytd_change < 0:
+
+            st.error(
+                f"📉 Dein Gesamtvermögen ist seit "
+                f"Jahresbeginn um **{format_chf(abs(ytd_change))}** "
+                f"bzw. **{ytd_percent:.2f}%** gesunken."
+            )
+
+        else:
+
+            st.info(
+                "➡️ Dein Gesamtvermögen hat sich "
+                "seit Jahresbeginn nicht verändert."
             )
 
 
@@ -395,6 +598,7 @@ if check_password():
 
         row1_col1, row1_col2, row1_col3 = st.columns(3)
 
+
         with row1_col1:
 
             st.metric(
@@ -406,6 +610,7 @@ if check_password():
                 )
             )
 
+
         with row1_col2:
 
             st.metric(
@@ -416,6 +621,7 @@ if check_password():
                     f"({spar_percent:+.2f}%)"
                 )
             )
+
 
         with row1_col3:
 
@@ -435,6 +641,7 @@ if check_password():
 
         row2_col1, row2_col2 = st.columns(2)
 
+
         with row2_col1:
 
             st.metric(
@@ -445,6 +652,7 @@ if check_password():
                     f"({priv_percent:+.2f}%)"
                 )
             )
+
 
         with row2_col2:
 
@@ -478,6 +686,7 @@ if check_password():
                 "### 📊 Aktuelle Verteilung"
             )
 
+
             asset_data = pd.DataFrame({
 
                 "Kategorie": [
@@ -495,6 +704,7 @@ if check_password():
                     v_priv,
                     v_lpp
                 ]
+
             })
 
 
@@ -610,7 +820,7 @@ if check_password():
                     }])
 
 
-                    # Datum entfernen, falls bereits vorhanden
+                    # Bestehenden Eintrag mit gleichem Datum entfernen
 
                     df_history = df_history[
                         df_history["Datum"]
