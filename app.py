@@ -47,7 +47,7 @@ if check_password():
         df_history = df_history.sort_values(by='Datum')
         latest_entry = df_history.iloc[-1]
 
-        st.title("🦅 Dein Echtes Vermögens-Dashboard")
+        st.title("🦅 Mein Vermögens-Dashboard")
         if st.sidebar.button("🔒 Abmelden"):
             st.session_state["password_correct"] = False
             st.rerun()
