@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # --- CONFIG: PASSWORT & DATEI ---
-SECRET_PASSWORD = "Schweiz2026"  # <-- ÄNDERE DEIN PASSWORT HIER!
+SECRET_PASSWORD = "viper01"  # <-- ÄNDERE DEIN PASSWORT HIER!
 DATA_FILE = "vermoegensdaten.csv"
 
 # --- LOGIN FUNKTION ---
