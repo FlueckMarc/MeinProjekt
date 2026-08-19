@@ -27,6 +27,7 @@ DATA_FILE = "vermoegensdaten.csv"
 # Vermögensziele
 ZIELVERMOEGEN = 1_000_000
 ZIEL_FREIES_VERMOEGEN = 750_000
+ZIEL_VORSORGE = 1_000_000
 
 
 # ============================================================
@@ -34,21 +35,12 @@ ZIEL_FREIES_VERMOEGEN = 750_000
 # ============================================================
 
 def format_chf(value):
-    """
-    Schweizer Zahlenformat
-    Beispiel:
-    981000 -> 981'000 CHF
-    """
+    """Schweizer Zahlenformat"""
     return f"{value:,.0f}".replace(",", "'") + " CHF"
 
 
 def format_change(value):
-    """
-    Schweizer Zahlenformat mit Vorzeichen
-    Beispiel:
-    30000 -> +30'000 CHF
-    -30000 -> -30'000 CHF
-    """
+    """Schweizer Zahlenformat mit Vorzeichen"""
     return f"{value:+,.0f}".replace(",", "'") + " CHF"
 
 
@@ -180,6 +172,27 @@ if check_password():
 
 
         # ====================================================
+        # FREE WEALTH
+        # ====================================================
+
+        free_assets = (
+            v_liq
+            + v_spar
+            + v_boerse
+        )
+
+
+        # ====================================================
+        # RETIREMENT / PENSION ASSETS
+        # ====================================================
+
+        vorsorge = (
+            v_priv
+            + v_lpp
+        )
+
+
+        # ====================================================
         # PREVIOUS VALUES
         # ====================================================
 
@@ -299,7 +312,7 @@ if check_password():
 
 
         # ====================================================
-        # YEAR-TO-DATE BERECHNUNG
+        # YEAR-TO-DATE
         # ====================================================
 
         current_year = latest_entry["Datum"].year
@@ -308,8 +321,6 @@ if check_password():
             df_history["Datum"].dt.year == current_year
         ].copy()
 
-
-        # Gesamtvermögen für jedes Datum berechnen
 
         df_current_year["Gesamtvermoegen"] = (
             df_current_year["Liquide_Mittel"]
@@ -320,8 +331,6 @@ if check_password():
         )
 
 
-        # Erster Eintrag des aktuellen Jahres
-
         first_year_entry = df_current_year.iloc[0]
 
         year_start_assets = (
@@ -329,15 +338,11 @@ if check_password():
         )
 
 
-        # Veränderung seit Jahresbeginn
-
         ytd_change = (
             total_assets
             - year_start_assets
         )
 
-
-        # Prozentuale Veränderung
 
         if year_start_assets != 0:
 
@@ -352,7 +357,7 @@ if check_password():
 
 
         # ====================================================
-        # YEAR-TO-DATE ANZEIGE
+        # YEAR-TO-DATE DISPLAY
         # ====================================================
 
         st.markdown(
@@ -363,8 +368,6 @@ if check_password():
         ytd_col1, ytd_col2, ytd_col3 = st.columns(3)
 
 
-        # Veränderung
-
         with ytd_col1:
 
             st.metric(
@@ -373,8 +376,6 @@ if check_password():
                 delta=f"{ytd_percent:+.2f}%"
             )
 
-
-        # Jahresanfang
 
         with ytd_col2:
 
@@ -385,8 +386,6 @@ if check_password():
                 )
             )
 
-
-        # Aktuell
 
         with ytd_col3:
 
@@ -431,8 +430,6 @@ if check_password():
         )
 
 
-        # Jahresstart-Linie
-
         fig_ytd.add_hline(
             y=year_start_assets,
             line_dash="dash",
@@ -471,7 +468,7 @@ if check_password():
 
 
         # ====================================================
-        # YTD ZUSAMMENFASSUNG
+        # YTD SUMMARY
         # ====================================================
 
         if ytd_change > 0:
@@ -502,83 +499,114 @@ if check_password():
 
 
         # ====================================================
-        # WEALTH TARGET
+        # THREE FINANCIAL TARGETS
         # ====================================================
 
-        st.markdown("### 🎯 Vermögensziel")
+        st.markdown("### 🎯 Meine finanziellen Ziele")
 
-        target_percentage = (
-            total_assets / ZIELVERMOEGEN
-        ) * 100
 
-        target_percentage_display = min(
-            max(target_percentage, 0),
-            100
-        )
+        target_col1, target_col2, target_col3 = st.columns(3)
 
-        st.progress(
-            target_percentage_display / 100
-        )
 
-        target_col1, target_col2 = st.columns(2)
+        # ----------------------------------------------------
+        # TOTAL WEALTH TARGET
+        # ----------------------------------------------------
 
         with target_col1:
+
+            st.markdown(
+                "#### 🎯 Vermögensziel"
+            )
+
+            target_percentage = (
+                total_assets
+                / ZIELVERMOEGEN
+            ) * 100
+
+            target_percentage_display = min(
+                max(target_percentage, 0),
+                100
+            )
+
+            st.progress(
+                target_percentage_display / 100
+            )
 
             st.markdown(
                 f"**{format_chf(total_assets)}** "
                 f"/ **{format_chf(ZIELVERMOEGEN)}**"
             )
 
-        with target_col2:
-
             st.markdown(
                 f"**{target_percentage:.1f} % erreicht**"
             )
 
 
-        st.markdown("<br>", unsafe_allow_html=True)
+        # ----------------------------------------------------
+        # FREE WEALTH TARGET
+        # ----------------------------------------------------
 
+        with target_col2:
 
-        # ====================================================
-        # FREE WEALTH
-        # ====================================================
+            st.markdown(
+                "#### 💰 Frei verfügbares Vermögen"
+            )
 
-        st.markdown(
-            "### 💰 Frei verfügbares Vermögen"
-        )
+            free_percentage = (
+                free_assets
+                / ZIEL_FREIES_VERMOEGEN
+            ) * 100
 
-        free_assets = (
-            v_liq
-            + v_spar
-            + v_boerse
-        )
+            free_percentage_display = min(
+                max(free_percentage, 0),
+                100
+            )
 
-        free_percentage = (
-            free_assets / ZIEL_FREIES_VERMOEGEN
-        ) * 100
-
-        free_percentage_display = min(
-            max(free_percentage, 0),
-            100
-        )
-
-        st.progress(
-            free_percentage_display / 100
-        )
-
-        free_col1, free_col2 = st.columns(2)
-
-        with free_col1:
+            st.progress(
+                free_percentage_display / 100
+            )
 
             st.markdown(
                 f"**{format_chf(free_assets)}** "
                 f"/ **{format_chf(ZIEL_FREIES_VERMOEGEN)}**"
             )
 
-        with free_col2:
-
             st.markdown(
                 f"**{free_percentage:.1f} % erreicht**"
+            )
+
+
+        # ----------------------------------------------------
+        # RETIREMENT TARGET
+        # ----------------------------------------------------
+
+        with target_col3:
+
+            st.markdown(
+                "#### 🛡️ Vorsorge"
+            )
+
+            vorsorge_percentage = (
+                vorsorge
+                / ZIEL_VORSORGE
+            ) * 100
+
+            vorsorge_percentage_display = min(
+                max(vorsorge_percentage, 0),
+                100
+            )
+
+            st.progress(
+                vorsorge_percentage_display / 100
+            )
+
+            st.markdown(
+                f"**{format_chf(vorsorge)}** "
+                f"/ **{format_chf(ZIEL_VORSORGE)}**"
+            )
+
+            st.markdown(
+                f"**{vorsorge_percentage:.1f} % erreicht**"
             )
 
 
@@ -591,10 +619,6 @@ if check_password():
 
         st.markdown("### 💰 Vermögenswerte")
 
-
-        # ----------------------------------------------------
-        # ROW 1
-        # ----------------------------------------------------
 
         row1_col1, row1_col2, row1_col3 = st.columns(3)
 
@@ -634,10 +658,6 @@ if check_password():
                 )
             )
 
-
-        # ----------------------------------------------------
-        # ROW 2
-        # ----------------------------------------------------
 
         row2_col1, row2_col2 = st.columns(2)
 
@@ -819,8 +839,6 @@ if check_password():
 
                     }])
 
-
-                    # Bestehenden Eintrag mit gleichem Datum entfernen
 
                     df_history = df_history[
                         df_history["Datum"]
