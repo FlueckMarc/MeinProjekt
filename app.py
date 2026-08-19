@@ -1,116 +1,115 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import os
+from datetime import datetime
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
     page_title="Personal Finance Dashboard",
     page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# --- STYLING (Custom CSS für ein modernes UI) ---
-st.markdown("""
-    <style>
-    .main { background-color: #f8f9fa; }
-    h1, h2, h3 { color: #1e293b; font-family: 'Inter', sans-serif; }
-    
-    /* Moderne KPI-Karten */
-    .metric-card {
-        background-color: #ffffff;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        border-left: 5px solid #3b82f6;
-        margin-bottom: 20px;
-    }
-    .metric-title { font-size: 14px; color: #64748b; font-weight: 600; text-transform: uppercase; }
-    .metric-value { font-size: 28px; color: #0f172a; font-weight: 700; margin: 5px 0; }
-    .metric-delta { font-size: 14px; font-weight: 500; color: #10b981; }
-    </style>
-""", unsafe_allow_html=True)
+# --- CONFIG: PASSWORT & DATEI ---
+SECRET_PASSWORD = "Schweiz2026"  # <-- ÄNDERE DEIN PASSWORT HIER!
+DATA_FILE = "vermoegensdaten.csv"
 
-# --- SIDEBAR (Interaktive Live-Datensteuerung) ---
-st.sidebar.header("🕹️ Live-Daten anpassen")
-st.sidebar.subheader("🏦 Bankkonten")
-chf_privat = st.sidebar.number_input("Privatkonto (CHF)", value=12500, step=500)
-chf_sparkonto = st.sidebar.number_input("Sparkonto (CHF)", value=45000, step=1000)
+# --- LOGIN FUNKTION ---
+def check_password():
+    if "password_correct" not in st.session_state:
+        st.session_state["password_correct"] = False
+    if st.session_state["password_correct"]:
+        return True
 
-st.sidebar.subheader("📈 Investitionen")
-chf_aktien = st.sidebar.number_input("Aktien & ETFs (CHF)", value=85000, step=1000)
-chf_crypto = st.sidebar.number_input("Kryptowährungen (CHF)", value=8500, step=500)
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns()
+    with col2:
+        st.subheader("🔒 Privates Finanz-Dashboard")
+        user_password = st.text_input("Passwort", type="password", key="login_password")
+        if st.button("Anmelden"):
+            if user_password == SECRET_PASSWORD:
+                st.session_state["password_correct"] = True
+                st.success("Login erfolgreich!")
+                st.rerun()
+            else:
+                st.error("❌ Falsches Passwort.")
+    return False
 
-st.sidebar.subheader("🛡️ Vorsorge")
-chf_saeule3a = st.sidebar.number_input("Säule 3a (CHF)", value=34000, step=1000)
-chf_pk = st.sidebar.number_input("Pensionskasse (CHF)", value=120000, step=5000)
+# --- MAIN APP START ---
+if check_password():
+    if not os.path.exists(DATA_FILE) or os.stat(DATA_FILE).st_size == 0:
+        st.error("Datei vermoegensdaten.csv nicht gefunden oder leer! Bitte erstelle sie im Ordner.")
+    else:
+        df_history = pd.read_csv(DATA_FILE)
+        df_history['Datum'] = pd.to_datetime(df_history['Datum'])
+        df_history = df_history.sort_values(by='Datum')
+        latest_entry = df_history.iloc[-1]
 
-st.sidebar.subheader("🛑 Verbindlichkeiten")
-chf_schulden = st.sidebar.number_input("Kredite / Leasing (CHF)", value=15000, step=1000)
+        st.title("🦅 Dein Echtes Vermögens-Dashboard")
+        if st.sidebar.button("🔒 Abmelden"):
+            st.session_state["password_correct"] = False
+            st.rerun()
 
-# --- DATEN-BERECHNUNG ---
-total_liquid = chf_privat + chf_sparkonto
-total_invested = chf_aktien + chf_crypto
-total_pension = chf_saeule3a + chf_pk
-total_assets = total_liquid + total_invested + total_pension
-net_worth = total_assets - chf_schulden
+        # --- BERECHNUNGEN ---
+        total_liquid = latest_entry['Liquide_Mittel']
+        total_invested = latest_entry['Sparvermoegen'] + latest_entry['Boerse']
+        total_pension = latest_entry['Private_Vorsorge'] + latest_entry['LPP']
+        total_assets = total_liquid + total_invested + total_pension
 
-# --- MAIN CONTENT ---
-st.title("🦅 Vermögens-Dashboard")
-st.markdown("Hier ist die visuelle Übersicht deiner gesamten finanziellen Situation.")
-st.markdown("---")
+        # --- METRICS ---
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Gesamtvermögen (Assets)", f"{total_assets:,.0f} CHF")
+        col2.metric("Investiertes Vermögen", f"{total_invested:,.0f} CHF")
+        col3.metric("Vorsorge-Guthaben", f"{total_pension:,.0f} CHF")
+        st.markdown("---")
 
-# --- REIHE 1: KEY METRICS ---
-col1, col2, col3, col4 = st.columns(4)
+        # --- LAYOUT SPALTEN ---
+        col_left, col_right = st.columns()
+        with col_left:
+            st.markdown("### 📊 Aktuelle Verteilung")
+            asset_data = pd.DataFrame({
+                "Kategorie": ["Liquide Mittel", "Sparvermögen", "Investitionen Börse", "Private Vorsorge", "LPP"],
+                "Betrag": [latest_entry['Liquide_Mittel'], latest_entry['Sparvermoegen'], latest_entry['Boerse'], latest_entry['Private_Vorsorge'], latest_entry['LPP']]
+            })
+            st.plotly_chart(px.pie(asset_data, values="Betrag", names="Kategorie", hole=0.4), use_container_width=True)
 
-with col1:
-    st.markdown(f'<div class="metric-card" style="border-left-color: #2563eb;"><div class="metric-title">Bruttovermögen</div><div class="metric-value">CHF {total_assets:,.2f}</div><div class="metric-delta">Gesamte Assets</div></div>', unsafe_allow_html=True)
+        with col_right:
+            st.markdown("### 📝 Neuen Monat hinzufügen")
+            with st.form("add_form", clear_on_submit=False):
+                input_date = st.date_input("Stichtag", datetime.now())
+                v_liq = st.number_input("Liquide Mittel (CHF)", value=float(latest_entry['Liquide_Mittel']))
+                v_spar = st.number_input("Sparvermögen (CHF)", value=float(latest_entry['Sparvermoegen']))
+                v_boerse = st.number_input("Investitionen Börse (CHF)", value=float(latest_entry['Boerse']))
+                v_priv = st.number_input("Private Vorsorge (CHF)", value=float(latest_entry['Private_Vorsorge']))
+                v_lpp = st.number_input("LPP (Pensionskasse - CHF)", value=float(latest_entry['LPP']))
+                
+                if st.form_submit_button("💾 Monat speichern"):
+                    new_row = pd.DataFrame([{
+                        "Datum": input_date.strftime("%Y-%m-%d"), "Liquide_Mittel": v_liq,
+                        "Sparvermoegen": v_spar, "Boerse": v_boerse, "Private_Vorsorge": v_priv, "LPP": v_lpp
+                    }])
+                    df_history = df_history[df_history['Datum'] != pd.to_datetime(new_row['Datum'].iloc[0])]
+                    df_all = pd.concat([df_history, new_row], ignore_index=True)
+                    df_all.to_csv(DATA_FILE, index=False)
+                    st.success("Erfolgreich gespeichert!")
+                    st.rerun()
 
-with col2:
-    st.markdown(f'<div class="metric-card" style="border-left-color: #10b981;"><div class="metric-title">Nettovermögen</div><div class="metric-value" style="color: #10b981;">CHF {net_worth:,.2f}</div><div class="metric-delta">Freies Vermögen</div></div>', unsafe_allow_html=True)
+        # --- GRAPH ---
+        st.markdown("---")
+        st.markdown("### 📈 Kumulative Evolution")
+        df_history['Liquidität'] = df_history['Liquide_Mittel']
+        df_history['Investments'] = df_history['Sparvermoegen'] + df_history['Boerse']
+        df_history['Vorsorge'] = df_history['Private_Vorsorge'] + df_history['LPP']
 
-with col3:
-    st.markdown(f'<div class="metric-card" style="border-left-color: #f59e0b;"><div class="metric-title">Investiert</div><div class="metric-value">CHF {total_invested:,.2f}</div><div class="metric-delta">Aktien & Krypto</div></div>', unsafe_allow_html=True)
+        fig_trend = go.Figure()
+        fig_trend.add_trace(go.Scatter(x=df_history['Datum'], y=df_history['Liquidität'], name="Liquide Mittel", stackgroup='one', line=dict(color='#2563eb')))
+        fig_trend.add_trace(go.Scatter(x=df_history['Datum'], y=df_history['Investments'], name="Investments", stackgroup='one', line=dict(color='#f59e0b')))
+        fig_trend.add_trace(go.Scatter(x=df_history['Datum'], y=df_history['Vorsorge'], name="Vorsorge (3a & LPP)", stackgroup='one', line=dict(color='#10b981')))
+        st.plotly_chart(fig_trend, use_container_width=True)
 
-with col4:
-    st.markdown(f'<div class="metric-card" style="border-left-color: #ef4444;"><div class="metric-title">Verbindlichkeiten</div><div class="metric-value" style="color: #ef4444;">CHF {chf_schulden:,.2f}</div><div class="metric-delta" style="color: #ef4444;">Schulden / Leasing</div></div>', unsafe_allow_html=True)
-
-# --- REIHE 2: DIAGRAMME ---
-st.markdown("### 📊 Vermögensaufteilung & Struktur")
-col_chart1, col_chart2 = st.columns(2)
-
-asset_data = pd.DataFrame({
-    "Kategorie": ["Privatkonto", "Sparkonto", "Aktien & ETFs", "Krypto", "Säule 3a", "Pensionskasse"],
-    "Betrag": [chf_privat, chf_sparkonto, chf_aktien, chf_crypto, chf_saeule3a, chf_pk],
-    "Klasse": ["Liquidität", "Liquidität", "Investments", "Investments", "Vorsorge", "Vorsorge"]
-})
-
-with col_chart1:
-    fig_pie = px.pie(asset_data, values="Betrag", names="Kategorie", title="Verteilung nach Anlageklasse", hole=0.4, color_discrete_sequence=px.colors.sequential.Plasma)
-    fig_pie.update_layout(margin=dict(t=40, b=0, l=0, r=0), legend=dict(orientation="h", y=-0.1))
-    st.plotly_chart(fig_pie, use_container_width=True)
-
-with col_chart2:
-    fig_sun = px.sunburst(asset_data, path=["Klasse", "Kategorie"], values="Betrag", title="Strukturierte Asset Allocation", color_discrete_sequence=px.colors.qualitative.Safe)
-    fig_sun.update_layout(margin=dict(t=40, b=0, l=0, r=0))
-    st.plotly_chart(fig_sun, use_container_width=True)
-
-# --- REIHE 3: ENTWICKLUNGSTREND ---
-st.markdown("---")
-st.markdown("### 🗓️ Vermögenswachstum (Historischer Trend)")
-
-months = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug"]
-history_liq = np.linspace(total_liquid*0.9, total_liquid, len(months))
-history_inv = np.array([total_invested*0.85, total_invested*0.88, total_invested*0.92, total_invested*0.91, total_invested*0.95, total_invested*0.94, total_invested*0.98, total_invested])
-history_pen = np.linspace(total_pension*0.96, total_pension, len(months))
-
-fig_trend = go.Figure()
-fig_trend.add_trace(go.Scatter(x=months, y=history_liq, name="Liquidität", stackgroup='one', line=dict(color='#2563eb')))
-fig_trend.add_trace(go.Scatter(x=months, y=history_inv, name="Investments", stackgroup='one', line=dict(color='#f59e0b')))
-fig_trend.add_trace(go.Scatter(x=months, y=history_pen, name="Vorsorge", stackgroup='one', line=dict(color='#10b981')))
-
-fig_trend.update_layout(title="Kumuliertes Wachstum über die letzten 8 Monate", xaxis_title="Monat", yaxis_title="Wert in CHF", legend=dict(orientation="h", y=1.1))
-st.plotly_chart(fig_trend, use_container_width=True)
+        # --- TABLE ---
+        st.markdown("### 🗒️ Komplette historische Tabelle")
+        st.dataframe(df_history[['Datum', 'Liquide_Mittel', 'Sparvermoegen', 'Boerse', 'Private_Vorsorge', 'LPP']], use_container_width=True)
 
