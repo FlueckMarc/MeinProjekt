@@ -24,7 +24,7 @@ def check_password():
         return True
 
     st.markdown("<br><br>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns()
+    col1, col2, col3 = st.columns(3)  # <-- REPARIERT: Zahl '3' hinzugefügt!
     with col2:
         st.subheader("🔒 Privates Finanz-Dashboard")
         user_password = st.text_input("Passwort", type="password", key="login_password")
@@ -66,7 +66,7 @@ if check_password():
         st.markdown("---")
 
         # --- LAYOUT SPALTEN ---
-        col_left, col_right = st.columns()
+        col_left, col_right = st.columns(2)  # <-- HIER AUCH ABGESICHERT
         with col_left:
             st.markdown("### 📊 Aktuelle Verteilung")
             asset_data = pd.DataFrame({
@@ -90,6 +90,7 @@ if check_password():
                         "Datum": input_date.strftime("%Y-%m-%d"), "Liquide_Mittel": v_liq,
                         "Sparvermoegen": v_spar, "Boerse": v_boerse, "Private_Vorsorge": v_priv, "LPP": v_lpp
                     }])
+                    # Zeile überschreiben falls gleiches Datum
                     df_history = df_history[df_history['Datum'] != pd.to_datetime(new_row['Datum'].iloc[0])]
                     df_all = pd.concat([df_history, new_row], ignore_index=True)
                     df_all.to_csv(DATA_FILE, index=False)
@@ -112,4 +113,3 @@ if check_password():
         # --- TABLE ---
         st.markdown("### 🗒️ Komplette historische Tabelle")
         st.dataframe(df_history[['Datum', 'Liquide_Mittel', 'Sparvermoegen', 'Boerse', 'Private_Vorsorge', 'LPP']], use_container_width=True)
-
