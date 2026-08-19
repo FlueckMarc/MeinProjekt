@@ -59,13 +59,13 @@ if check_password():
         v_priv = latest_entry['Private_Vorsorge']
         v_lpp = latest_entry['LPP']
         total_assets = v_liq + v_spar + v_boerse + v_priv + v_lpp
-        # --- METRICS (Exakt aufgeteilt in deine 5 Wunschkategorien + Total) ---
+        # --- METRICS ---
         row1_col1, row1_col2, row1_col3 = st.columns(3)
         row1_col1.metric("🦅 Gesamtkapital (Total Assets)", f"{total_assets:,.0f} CHF")
         row1_col2.metric("💵 Liquide Mittel", f"{v_liq:,.0f} CHF")
         row1_col3.metric("🏦 Sparkapital", f"{v_spar:,.0f} CHF")
         
-        st.markdown("<br>", unsafe_allow_html=True) # Kleiner Abstandhalter
+        st.markdown("<br>", unsafe_allow_html=True)
         
         row2_col1, row2_col2, row2_col3 = st.columns(3)
         row2_col1.metric("📈 Investiertes Kapital", f"{v_boerse:,.0f} CHF")
@@ -99,15 +99,34 @@ if check_password():
                         "Datum": input_date.strftime("%Y-%m-%d"), "Liquide_Mittel": v_liq_in,
                         "Sparvermoegen": v_spar_in, "Boerse": v_boerse_in, "Private_Vorsorge": v_priv_in, "LPP": v_lpp_in
                     }])
-                    df_history = df_history[df_history['Datum'] != pd.to_datetime(new_row['Datum'].iloc)]
+                    df_history = df_history[df_history['Datum'] != pd.to_datetime(new_row['Datum'].iloc[0])]
                     df_all = pd.concat([df_history, new_row], ignore_index=True)
                     df_all.to_csv(DATA_FILE, index=False)
                     st.success("Erfolgreich gespeichert!")
                     st.rerun()
 
+            # --- NEU: EINTRAG LÖSCHEN FORMULAR ---
+            st.markdown("---")
+            st.markdown("### 🗑️ Eintrag löschen")
+            # Formatierte Datumsliste für das Dropdown erstellen
+            df_history['Datum_Str'] = df_history['Datum'].dt.strftime('%Y-%m-%d')
+            all_dates = df_history['Datum_Str'].unique().tolist()
+            
+            with st.form("delete_form", clear_on_submit=True):
+                date_to_delete = st.selectbox("Wähle das Datum aus, das gelöscht werden soll:", all_dates)
+                if st.form_submit_button("❌ Ausgewählten Monat unwiderruflich löschen"):
+                    # Filtere die Zeile heraus
+                    df_all = df_history[df_history['Datum_Str'] != date_to_delete]
+                    # Hilfsspalten entfernen vor dem Speichern
+                    df_save = df_all.drop(columns=['Datum_Str'], errors='ignore')
+                    df_save.to_csv(DATA_FILE, index=False)
+                    st.success(f"Eintrag vom {date_to_delete} wurde erfolgreich gelöscht!")
+                    st.rerun()
+
         # --- GRAPH ---
         st.markdown("---")
         st.markdown("### 📈 Kumulative Evolution")
+        # Hilfsspalten für den Graphen neu berechnen, falls vorher gelöscht wurde
         df_history['Liquidität'] = df_history['Liquide_Mittel']
         df_history['Sparkapital_Klasse'] = df_history['Sparvermoegen']
         df_history['Investments'] = df_history['Boerse']
