@@ -379,35 +379,35 @@ if check_password():
 
         def metric_text(title, value, change, percent):
 
-    if change > 0:
-        arrow = "▲"
-        change_color = "#16a34a"  # Grün
+            if change > 0:
+                arrow = "▲"
+                 change_color = "#16a34a"  # Grün
 
-    elif change < 0:
-        arrow = "▼"
-        change_color = "#dc2626"  # Rot
+            elif change < 0:
+                arrow = "▼"
+                 change_color = "#dc2626"  # Rot
 
-    else:
-        arrow = "→"
-        change_color = "#64748b"  # Grau
+            else:
+                 arrow = "→"
+                change_color = "#64748b"  # Grau
 
-    return f"""
-    <div style="
-        padding:18px;
-        border-radius:12px;
-        background-color:#f8fafc;
-        border:1px solid #e2e8f0;
-        margin-bottom:10px;
-    ">
+            return f"""
+            <div style="
+                 padding:18px;
+                border-radius:12px;
+                 background-color:#f8fafc;
+                border:1px solid #e2e8f0;
+                margin-bottom:10px;
+            ">
 
-        <div style="
-            font-size:16px;
-            font-weight:600;
-        ">
+             <div style="
+                 font-size:16px;
+                 font-weight:600;
+             ">
             {title}
-        </div>
+             </div>
 
-        <div style="
+             <div style="
             font-size:25px;
             font-weight:700;
             margin-top:5px;
