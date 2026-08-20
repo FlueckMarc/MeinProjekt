@@ -232,6 +232,15 @@ positionen = [
 
     {
         "Depot": "Hypi",
+         "Name": "Hypothekarbank Lenzburg",
+         "Ticker": "HBLN.SW",
+         "Anteile": 4,
+         "Einstand": 4240.00,
+         "Währung": "CHF"
+    },
+
+    {
+        "Depot": "Hypi",
         "Name": "Vale",
         "Ticker": "VALE",
         "Anteile": 140,
