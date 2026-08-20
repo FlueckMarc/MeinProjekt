@@ -4,6 +4,7 @@ import yfinance as yf
 from pathlib import Path
 from datetime import date
 
+
 # =========================================================
 # SEITENKONFIGURATION
 # =========================================================
@@ -14,6 +15,7 @@ st.set_page_config(
     layout="wide"
 )
 
+
 # =========================================================
 # DATEIEN
 # =========================================================
@@ -21,6 +23,7 @@ st.set_page_config(
 BASE_DIR = Path(__file__).parent.parent
 
 HISTORIE_FILE = BASE_DIR / "depot_historie.csv"
+EINZAHLUNGEN_FILE = BASE_DIR / "einzahlungen.csv"
 FIND_FILE = BASE_DIR / "findependent_historie.csv"
 AKTUELL_FILE = BASE_DIR / "depot_aktuell.csv"
 FONDS_FILE = BASE_DIR / "fonds_historie.csv"
@@ -232,11 +235,11 @@ positionen = [
 
     {
         "Depot": "Hypi",
-         "Name": "Hypothekarbank Lenzburg",
-         "Ticker": "HBLN.SW",
-         "Anteile": 4,
-         "Einstand": 4240.00,
-         "Währung": "CHF"
+        "Name": "Hypothekarbank Lenzburg",
+        "Ticker": "HBLN.SW",
+        "Anteile": 4,
+        "Einstand": 4240.00,
+        "Währung": "CHF"
     },
 
     {
@@ -324,12 +327,9 @@ def aktualisiere_depot():
         "CAD"
     ]:
 
-        kurs = lade_wechselkurs(
-            waehrung
-        )
+        kurs = lade_wechselkurs(waehrung)
 
         if kurs is not None:
-
             waehrungen[waehrung] = kurs
 
 
@@ -340,7 +340,6 @@ def aktualisiere_depot():
         )
 
         if kurs is None:
-
             kurs = 0.0
 
 
@@ -394,32 +393,17 @@ def aktualisiere_depot():
         ergebnisse.append({
 
             "Depot": pos["Depot"],
-
             "Name": pos["Name"],
-
             "Ticker": pos["Ticker"],
-
             "Anteile": pos["Anteile"],
-
             "Einstand": pos["Einstand"],
-
             "Kurs": kurs,
-
             "Währung": pos["Währung"],
-
             "FX": wechselkurs,
-
-            "Wert Original":
-                wert_original,
-
-            "Wert CHF":
-                wert_chf,
-
-            "Gewinn CHF":
-                gewinn,
-
-            "Gewinn %":
-                gewinn_prozent
+            "Wert Original": wert_original,
+            "Wert CHF": wert_chf,
+            "Gewinn CHF": gewinn,
+            "Gewinn %": gewinn_prozent
         })
 
 
@@ -430,7 +414,7 @@ def aktualisiere_depot():
 
 
 # =========================================================
-# DEPOTHISTORIE
+# DEPOTHISTORIE LADEN
 # =========================================================
 
 def lade_historie():
@@ -449,6 +433,11 @@ def lade_historie():
                     df["Datum"]
                 )
 
+                df["Depotwert"] = pd.to_numeric(
+                    df["Depotwert"],
+                    errors="coerce"
+                )
+
                 return df
 
         except Exception:
@@ -459,19 +448,17 @@ def lade_historie():
     return pd.DataFrame(
         columns=[
             "Datum",
-            "Depotwert",
-            "Einzahlung"
+            "Depotwert"
         ]
     )
 
 
 # =========================================================
-# HISTORIE SPEICHERN
+# DEPOTWERT SPEICHERN
 # =========================================================
 
-def speichere_historie(
+def speichere_depotwert(
     depotwert,
-    einzahlung=0,
     datum=None
 ):
 
@@ -496,10 +483,6 @@ def speichere_historie(
 
         "Depotwert": [
             float(depotwert)
-        ],
-
-        "Einzahlung": [
-            float(einzahlung)
         ]
     })
 
@@ -533,7 +516,97 @@ def speichere_historie(
 
 
 # =========================================================
-# FINDINDEPENDENT
+# EINZAHLUNGEN LADEN
+# =========================================================
+
+def lade_einzahlungen():
+
+    if EINZAHLUNGEN_FILE.exists():
+
+        try:
+
+            df = pd.read_csv(
+                EINZAHLUNGEN_FILE
+            )
+
+            if not df.empty:
+
+                df["Datum"] = pd.to_datetime(
+                    df["Datum"]
+                )
+
+                df["Betrag"] = pd.to_numeric(
+                    df["Betrag"],
+                    errors="coerce"
+                )
+
+                return df
+
+        except Exception:
+
+            pass
+
+
+    return pd.DataFrame(
+        columns=[
+            "Datum",
+            "Depot",
+            "Betrag"
+        ]
+    )
+
+
+# =========================================================
+# EINZAHLUNG SPEICHERN
+# =========================================================
+
+def speichere_einzahlung(
+    datum,
+    depot,
+    betrag
+):
+
+    df = lade_einzahlungen()
+
+
+    neuer_eintrag = pd.DataFrame({
+
+        "Datum": [
+            pd.to_datetime(datum)
+        ],
+
+        "Depot": [
+            depot
+        ],
+
+        "Betrag": [
+            float(betrag)
+        ]
+    })
+
+
+    df = pd.concat(
+        [
+            df,
+            neuer_eintrag
+        ],
+        ignore_index=True
+    )
+
+
+    df = df.sort_values(
+        "Datum"
+    )
+
+
+    df.to_csv(
+        EINZAHLUNGEN_FILE,
+        index=False
+    )
+
+
+# =========================================================
+# FINDINDEPENDENT LADEN
 # =========================================================
 
 def lade_findependent():
@@ -618,7 +691,7 @@ def speichere_findependent(
 
 
 # =========================================================
-# FONDS HISTORIE
+# FONDS HISTORIE LADEN
 # =========================================================
 
 def lade_fonds():
@@ -1027,9 +1100,8 @@ st.metric(
 # AKTUELLEN DEPOTWERT SPEICHERN
 # =========================================================
 
-speichere_historie(
-    gesamtdepot,
-    0
+speichere_depotwert(
+    gesamtdepot
 )
 
 
@@ -1037,12 +1109,19 @@ speichere_historie(
 # EINZAHLUNGEN
 # =========================================================
 
+st.divider()
+
 st.subheader(
     "💵 Einzahlung erfassen"
 )
 
+st.caption(
+    "Die Einzahlung wird separat gespeichert und "
+    "nicht als Anlagegewinn gewertet."
+)
 
-col1, col2 = st.columns(2)
+
+col1, col2, col3 = st.columns(3)
 
 
 with col1:
@@ -1055,6 +1134,21 @@ with col1:
 
 
 with col2:
+
+    einzahlung_depot = st.selectbox(
+        "Einzahlung auf",
+        [
+            "Swissquote",
+            "Hypi",
+            "UBS",
+            "BCV",
+            "Findependent"
+        ],
+        key="einzahlung_depot"
+    )
+
+
+with col3:
 
     einzahlung = st.number_input(
         "Einzahlung CHF",
@@ -1072,17 +1166,116 @@ if st.button(
 
     if einzahlung > 0:
 
-        speichere_historie(
-            gesamtdepot,
-            einzahlung,
-            einzahlung_datum
+        speichere_einzahlung(
+            einzahlung_datum,
+            einzahlung_depot,
+            einzahlung
         )
 
         st.success(
-            "Einzahlung gespeichert."
+            f"{format_chf(einzahlung)} auf "
+            f"{einzahlung_depot} gespeichert."
         )
 
         st.rerun()
+
+    else:
+
+        st.warning(
+            "Bitte zuerst einen Betrag eingeben."
+        )
+
+
+# =========================================================
+# EINZAHLUNGSÜBERSICHT
+# =========================================================
+
+einzahlungen_df = lade_einzahlungen()
+
+
+if not einzahlungen_df.empty:
+
+    st.markdown(
+        "#### 📋 Einzahlungshistorie"
+    )
+
+    einzahlungen_anzeige = (
+        einzahlungen_df
+        .sort_values("Datum", ascending=False)
+        .copy()
+    )
+
+    einzahlungen_anzeige["Betrag"] = (
+        einzahlungen_anzeige["Betrag"]
+        .apply(format_chf)
+    )
+
+    einzahlungen_anzeige["Datum"] = (
+        einzahlungen_anzeige["Datum"]
+        .dt.strftime("%d.%m.%Y")
+    )
+
+    st.dataframe(
+        einzahlungen_anzeige[
+            [
+                "Datum",
+                "Depot",
+                "Betrag"
+            ]
+        ],
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # -----------------------------------------------------
+    # EINZAHLUNGEN GESAMT
+    # -----------------------------------------------------
+
+    st.markdown(
+        "#### 💰 Einzahlungen nach Depot"
+    )
+
+    einzahlung_summe = (
+        einzahlungen_df
+        .groupby("Depot")["Betrag"]
+        .sum()
+    )
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+
+    for col, depot_name in zip(
+        [c1, c2, c3, c4, c5],
+        [
+            "Swissquote",
+            "Hypi",
+            "UBS",
+            "BCV",
+            "Findependent"
+        ]
+    ):
+
+        with col:
+
+            wert = float(
+                einzahlung_summe.get(
+                    depot_name,
+                    0.0
+                )
+            )
+
+            st.metric(
+                depot_name,
+                format_chf(wert)
+            )
+
+    st.metric(
+        "Gesamte Einzahlungen",
+        format_chf(
+            float(
+                einzahlungen_df["Betrag"].sum()
+            )
+        )
+    )
 
 
 # =========================================================
@@ -1169,21 +1362,35 @@ if len(hist) >= 2:
         )
 
 
-        einzahlungen = float(
-            periode["Einzahlung"].sum()
-        )
+        # -------------------------------------------------
+        # EINZAHLUNGEN IM ZEITRAUM
+        # -------------------------------------------------
+
+        if not einzahlungen_df.empty:
+
+            einzahlungen_zeitraum = (
+                einzahlungen_df[
+                    einzahlungen_df["Datum"]
+                    >= startdatum
+                ]["Betrag"]
+                .sum()
+            )
+
+        else:
+
+            einzahlungen_zeitraum = 0.0
 
 
         echter_gewinn = (
             endwert
             - startwert
-            - einzahlungen
+            - float(einzahlungen_zeitraum)
         )
 
 
         basis = (
             startwert
-            + einzahlungen
+            + float(einzahlungen_zeitraum)
         )
 
 
@@ -1213,7 +1420,9 @@ if len(hist) >= 2:
 
             st.metric(
                 "Einzahlungen",
-                format_chf(einzahlungen)
+                format_chf(
+                    float(einzahlungen_zeitraum)
+                )
             )
 
 
@@ -1399,12 +1608,12 @@ with st.expander(
     Fremdwährungen werden zum aktuellen Wechselkurs in CHF
     umgerechnet.
 
+    Einzahlungen werden separat erfasst und nicht als
+    Anlagegewinn betrachtet.
+
     **Gewinn/Verlust:**
 
     `Endwert − Anfangswert − Einzahlungen`
-
-    Dadurch werden zusätzliche Einzahlungen nicht als
-    Anlagegewinn betrachtet.
 
     Beispiel:
 
@@ -1419,8 +1628,17 @@ with st.expander(
     **CHF 195'000 − CHF 180'000 − CHF 10'000
     = CHF 5'000 Gewinn**
 
-    Die historische Depotentwicklung wird bei den
-    Aktualisierungen der App automatisch gespeichert.
+    Die Einzahlungen werden zusätzlich einem konkreten
+    Depot zugeordnet:
+
+    - Swissquote
+    - Hypi
+    - UBS
+    - BCV
+    - Findependent
+
+    Dadurch können die Einzahlungen später auch separat
+    nach Depot ausgewertet werden.
     """)
 
 
