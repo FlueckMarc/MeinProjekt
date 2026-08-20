@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.graph_objects as go
 from pathlib import Path
 
-
 # =========================================================
 # SEITENKONFIGURATION
 # =========================================================
@@ -14,99 +13,21 @@ st.set_page_config(
     layout="wide"
 )
 
-
 # =========================================================
-# DATEN DATEIEN
-# =========================================================
-
-BASE_DIR = Path(__file__).parent.parent
-
-DATA_FILE = BASE_DIR / "vermoegensdaten.csv"
-DEPOT_FILE = BASE_DIR / "depot_aktuell.csv"
-
-
-# =========================================================
-# HILFSFUNKTIONEN
+# DATEN LADEN
 # =========================================================
 
-def format_chf(value):
-    return f"CHF {value:,.0f}".replace(",", "'")
-
-
-def load_current_depot():
-
-    """
-    Lädt den aktuell berechneten Depotwert aus
-    depot_aktuell.csv.
-
-    Erwartete Spalte:
-    Depotwert
-    """
-
-    if not DEPOT_FILE.exists():
-        return None
-
-    try:
-
-        depot_df = pd.read_csv(
-            DEPOT_FILE
-        )
-
-        if depot_df.empty:
-            return None
-
-        if "Depotwert" not in depot_df.columns:
-            return None
-
-        return float(
-            depot_df["Depotwert"].iloc[-1]
-        )
-
-    except Exception:
-
-        return None
-
-
-# =========================================================
-# VERMÖGENSDATEN LADEN
-# =========================================================
-
-if not DATA_FILE.exists():
-
-    st.error(
-        "Die Datei 'vermoegensdaten.csv' "
-        "wurde nicht gefunden."
-    )
-
-    st.stop()
-
+DATA_FILE = Path(__file__).parent.parent / "vermoegensdaten.csv"
 
 try:
-
-    df = pd.read_csv(
-        DATA_FILE
-    )
-
+    df = pd.read_csv(DATA_FILE)
 except Exception:
-
-    st.error(
-        "Die Datei 'vermoegensdaten.csv' "
-        "konnte nicht gelesen werden."
-    )
-
+    st.error("Die Datei 'vermoegensdaten.csv' wurde nicht gefunden.")
     st.stop()
 
+df.columns = [str(col).strip() for col in df.columns]
 
-df.columns = [
-    str(col).strip()
-    for col in df.columns
-]
-
-
-# =========================================================
-# DATUM
-# =========================================================
-
+# Erste Spalte als Datum
 datum_spalte = df.columns[0]
 
 df[datum_spalte] = pd.to_datetime(
@@ -122,487 +43,425 @@ df = df.sort_values(
     datum_spalte
 )
 
-
 # =========================================================
-# AKTUELLES GESAMTVERMÖGEN
+# GESAMTVERMÖGEN AUS CSV
 # =========================================================
 
-numeric_columns = (
-    df.select_dtypes(
-        include="number"
-    ).columns.tolist()
-)
+numeric_columns = df.select_dtypes(
+    include="number"
+).columns.tolist()
 
 if not numeric_columns:
 
     st.error(
-        "Keine numerischen Vermögensdaten "
-        "in der CSV gefunden."
+        "Keine numerischen Vermögensdaten in der CSV gefunden."
     )
 
     st.stop()
 
-
-df["Gesamtvermögen"] = (
-    df[numeric_columns]
-    .sum(axis=1)
-)
-
+df["Gesamtvermögen"] = df[
+    numeric_columns
+].sum(axis=1)
 
 aktuelles_gesamtvermoegen = float(
     df["Gesamtvermögen"].iloc[-1]
 )
 
-
-# =========================================================
-# AKTUELLEN DEPOTWERT LADEN
-# =========================================================
-
-aktueller_depotwert = (
-    load_current_depot()
-)
-
-
 # =========================================================
 # TITEL
 # =========================================================
 
-st.title(
-    "🔮 Vermögensprognose"
-)
+st.title("🔮 Vermögensprognose")
 
 st.caption(
-    "Individuelle Prognose für deine "
+    "Individuelle langfristige Prognose deiner "
     "verschiedenen Vermögensbereiche"
 )
 
-
-# =========================================================
-# AKTUELLER DEPOTWERT
-# =========================================================
-
-if aktueller_depotwert is not None:
-
-    st.success(
-        f"📈 Aktueller Depotwert automatisch "
-        f"übernommen: **{format_chf(aktueller_depotwert)}**"
-    )
-
-else:
-
-    st.info(
-        "ℹ️ Kein aktueller Depotwert gefunden. "
-        "Bitte zuerst die Depotseite öffnen bzw. "
-        "den aktuellen Depotwert aktualisieren."
-    )
-
-
 st.divider()
 
-
 # =========================================================
-# INFO-BEREICH
+# INFO
 # =========================================================
 
 with st.expander(
     "ℹ️ Wie wird die Prognose berechnet?"
 ):
 
-    st.markdown(
-        """
-### Berechnung
+    st.markdown("""
+    ### Berechnung
 
-Jeder Vermögensbereich wird **separat** berechnet.
+    Jeder Vermögensbereich wird **separat** berechnet.
 
-Die jährliche Berechnung lautet:
+    Die jährliche Berechnung lautet:
 
-**Vorjahreswert × (1 + Rendite) + jährliche Sparrate**
+    `Vorjahreswert × (1 + Rendite) + jährliche Sparrate`
 
-Beispiel:
+    Beispiel:
 
-Ein Bereich mit CHF 100'000 Startvermögen,
-5 % Rendite und CHF 10'000 jährlicher Einzahlung:
+    Startvermögen: CHF 100'000  
+    Rendite: 5 %  
+    Sparrate: CHF 10'000
 
-**CHF 100'000 × 1,05 + CHF 10'000 = CHF 115'000**
+    ergibt nach einem Jahr:
 
-Im nächsten Jahr wird mit diesen CHF 115'000 weitergerechnet.
+    **CHF 100'000 × 1,05 + CHF 10'000 = CHF 115'000**
 
-### Drei unterschiedliche Bereiche
+    Im darauffolgenden Jahr wird mit diesen CHF 115'000
+    weitergerechnet.
 
-Die drei Bereiche haben jeweils:
+    Dadurch können beispielsweise unterschiedliche Renditen
+    für Wertschriften, liquide Mittel, LPP oder Vorsorge
+    verwendet werden.
 
-- eigenes Startvermögen
-- eigene jährliche Sparrate
-- eigene erwartete Rendite
+    Erst danach werden alle fünf Bereiche zum
+    **Gesamtvermögen** addiert.
 
-Die Renditen werden **nicht zu einer einzigen Durchschnittsrendite
-zusammengefasst**.
+    Die Kaufkraftbereinigung berücksichtigt zusätzlich
+    die eingegebene Inflation.
 
-Stattdessen wird jeder Bereich separat fortgeschrieben.
-
-Danach werden die drei Bereiche addiert:
-
-**Bereich 1 + Bereich 2 + Bereich 3 = Gesamtvermögen**
-
-Dadurch können beispielsweise Wertschriften mit 5 %,
-Cash mit 1 % und Vorsorge mit 3 % gleichzeitig berücksichtigt werden.
-
-### Aktuelles Depot
-
-Wenn `depot_aktuell.csv` vorhanden ist, wird der dort gespeicherte
-aktuelle Depotwert automatisch als Startvermögen für den
-Wertschriften-Bereich verwendet.
-
-Damit musst du den aktuellen Depotwert nicht mehr manuell eingeben.
-
-### Kaufkraft
-
-Zusätzlich wird die zukünftige Kaufkraft unter Berücksichtigung
-der eingegebenen Inflation berechnet.
-
-Die Berechnung ist eine Modellrechnung und keine Garantie für die
-tatsächliche zukünftige Entwicklung.
-"""
-    )
-
+    Die Prognose ist eine Modellrechnung und keine Garantie
+    für die tatsächliche zukünftige Entwicklung.
+    """)
 
 # =========================================================
 # ALLGEMEINE EINSTELLUNGEN
 # =========================================================
 
-st.subheader(
-    "⚙️ Allgemeine Einstellungen"
-)
+st.subheader("⚙️ Allgemeine Einstellungen")
 
 col1, col2 = st.columns(2)
 
 aktuelles_jahr = pd.Timestamp.now().year
 
-
 with col1:
 
     endjahr = st.slider(
         "Prognose bis",
-
         min_value=aktuelles_jahr + 1,
-
         max_value=2070,
-
         value=2050,
-
         step=1
     )
-
 
 with col2:
 
     inflation = st.slider(
         "Inflation",
-
         min_value=0.0,
-
         max_value=5.0,
-
         value=1.5,
-
         step=0.1,
-
         format="%.1f %%"
     )
 
-
 st.divider()
 
-
 # =========================================================
-# BEREICHE
+# VERMÖGENSBEREICHE
 # =========================================================
 
-st.subheader(
-    "💰 Deine Vermögensbereiche"
-)
+st.subheader("💰 Deine Vermögensbereiche")
 
 st.caption(
-    "Passe Startvermögen, jährliche Sparrate und "
-    "erwartete Rendite für jeden Bereich individuell an."
+    "Passe Startvermögen, jährliche Sparrate und erwartete "
+    "Rendite für jeden Bereich individuell an."
 )
 
-
 # =========================================================
-# BEREICH 1
+# BEREICH 1 – WERTSCHRIFTEN
 # =========================================================
 
 with st.container(border=True):
 
-    st.markdown(
-        "### 🟢 Bereich 1"
-    )
+    st.markdown("### 📈 Wertschriften")
 
     col1, col2, col3 = st.columns(3)
-
 
     with col1:
 
         name1 = st.text_input(
             "Bezeichnung",
-
             value="Wertschriften",
-
             key="name1"
         )
 
-
     with col2:
 
-        # -------------------------------------------------
-        # AKTUELLEN DEPOTWERT VERWENDEN
-        # -------------------------------------------------
-
-        standard_start1 = (
-            aktueller_depotwert
-            if aktueller_depotwert is not None
-            else 160_000
-        )
-
         start1 = st.number_input(
-            "Startvermögen",
-
-            min_value=0,
-
-            max_value=10_000_000,
-
-            value=int(
-                standard_start1
-            ),
-
-            step=5_000,
-
+            "Startvermögen CHF",
+            min_value=0.0,
+            max_value=10_000_000.0,
+            value=160_000.0,
+            step=5_000.0,
             key="start1"
         )
-
 
     with col3:
 
         sparrate1 = st.number_input(
-            "Sparrate pro Jahr",
-
-            min_value=0,
-
-            max_value=1_000_000,
-
-            value=20_000,
-
-            step=1_000,
-
+            "Sparrate pro Jahr CHF",
+            min_value=0.0,
+            max_value=1_000_000.0,
+            value=20_000.0,
+            step=1_000.0,
             key="sparrate1"
         )
 
-
     rendite1 = st.slider(
         "Erwartete Rendite",
-
         min_value=0.0,
-
         max_value=15.0,
-
         value=5.0,
-
         step=0.5,
-
         format="%.1f %%",
-
         key="rendite1"
     )
 
-
 # =========================================================
-# BEREICH 2
+# BEREICH 2 – SPARVERMÖGEN
 # =========================================================
 
 with st.container(border=True):
 
-    st.markdown(
-        "### 🔵 Bereich 2"
-    )
+    st.markdown("### 🏦 Sparvermögen")
 
     col1, col2, col3 = st.columns(3)
-
 
     with col1:
 
         name2 = st.text_input(
             "Bezeichnung",
-
-            value="Cash",
-
+            value="Sparvermögen",
             key="name2"
         )
-
 
     with col2:
 
         start2 = st.number_input(
-            "Startvermögen",
-
-            min_value=0,
-
-            max_value=10_000_000,
-
-            value=300_000,
-
-            step=5_000,
-
+            "Startvermögen CHF",
+            min_value=0.0,
+            max_value=10_000_000.0,
+            value=100_000.0,
+            step=5_000.0,
             key="start2"
         )
-
 
     with col3:
 
         sparrate2 = st.number_input(
-            "Sparrate pro Jahr",
-
-            min_value=0,
-
-            max_value=1_000_000,
-
-            value=10_000,
-
-            step=1_000,
-
+            "Sparrate pro Jahr CHF",
+            min_value=0.0,
+            max_value=1_000_000.0,
+            value=10_000.0,
+            step=1_000.0,
             key="sparrate2"
         )
 
-
     rendite2 = st.slider(
         "Erwartete Rendite",
-
         min_value=0.0,
-
         max_value=15.0,
-
-        value=1.0,
-
+        value=1.5,
         step=0.5,
-
         format="%.1f %%",
-
         key="rendite2"
     )
 
-
 # =========================================================
-# BEREICH 3
+# BEREICH 3 – LIQUIDE MITTEL
 # =========================================================
 
 with st.container(border=True):
 
-    st.markdown(
-        "### 🟠 Bereich 3"
-    )
+    st.markdown("### 💶 Liquide Mittel")
 
     col1, col2, col3 = st.columns(3)
-
 
     with col1:
 
         name3 = st.text_input(
             "Bezeichnung",
-
-            value="Vorsorge",
-
+            value="Liquide Mittel",
             key="name3"
         )
-
 
     with col2:
 
         start3 = st.number_input(
-            "Startvermögen",
-
-            min_value=0,
-
-            max_value=10_000_000,
-
-            value=400_000,
-
-            step=5_000,
-
+            "Startvermögen CHF",
+            min_value=0.0,
+            max_value=10_000_000.0,
+            value=200_000.0,
+            step=5_000.0,
             key="start3"
         )
-
 
     with col3:
 
         sparrate3 = st.number_input(
-            "Sparrate pro Jahr",
-
-            min_value=0,
-
-            max_value=1_000_000,
-
-            value=15_000,
-
-            step=1_000,
-
+            "Sparrate pro Jahr CHF",
+            min_value=0.0,
+            max_value=1_000_000.0,
+            value=10_000.0,
+            step=1_000.0,
             key="sparrate3"
         )
 
-
     rendite3 = st.slider(
         "Erwartete Rendite",
-
         min_value=0.0,
-
         max_value=15.0,
-
-        value=3.0,
-
+        value=1.0,
         step=0.5,
-
         format="%.1f %%",
-
         key="rendite3"
     )
 
+# =========================================================
+# BEREICH 4 – LPP
+# =========================================================
+
+with st.container(border=True):
+
+    st.markdown("### 🏛️ LPP")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+
+        name4 = st.text_input(
+            "Bezeichnung",
+            value="LPP",
+            key="name4"
+        )
+
+    with col2:
+
+        start4 = st.number_input(
+            "Startvermögen CHF",
+            min_value=0.0,
+            max_value=10_000_000.0,
+            value=400_000.0,
+            step=5_000.0,
+            key="start4"
+        )
+
+    with col3:
+
+        sparrate4 = st.number_input(
+            "Sparrate pro Jahr CHF",
+            min_value=0.0,
+            max_value=1_000_000.0,
+            value=15_000.0,
+            step=1_000.0,
+            key="sparrate4"
+        )
+
+    rendite4 = st.slider(
+        "Erwartete Rendite",
+        min_value=0.0,
+        max_value=15.0,
+        value=3.0,
+        step=0.5,
+        format="%.1f %%",
+        key="rendite4"
+    )
 
 # =========================================================
-# GESAMT DER STARTWERTE
+# BEREICH 5 – VORSORGE
+# =========================================================
+
+with st.container(border=True):
+
+    st.markdown("### 🛡️ Vorsorge")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+
+        name5 = st.text_input(
+            "Bezeichnung",
+            value="Vorsorge",
+            key="name5"
+        )
+
+    with col2:
+
+        start5 = st.number_input(
+            "Startvermögen CHF",
+            min_value=0.0,
+            max_value=10_000_000.0,
+            value=100_000.0,
+            step=5_000.0,
+            key="start5"
+        )
+
+    with col3:
+
+        sparrate5 = st.number_input(
+            "Sparrate pro Jahr CHF",
+            min_value=0.0,
+            max_value=1_000_000.0,
+            value=10_000.0,
+            step=1_000.0,
+            key="sparrate5"
+        )
+
+    rendite5 = st.slider(
+        "Erwartete Rendite",
+        min_value=0.0,
+        max_value=15.0,
+        value=3.0,
+        step=0.5,
+        format="%.1f %%",
+        key="rendite5"
+    )
+
+# =========================================================
+# STARTVERMÖGEN
 # =========================================================
 
 start_gesamt = (
     start1
     + start2
     + start3
+    + start4
+    + start5
 )
 
+sparrate_gesamt = (
+    sparrate1
+    + sparrate2
+    + sparrate3
+    + sparrate4
+    + sparrate5
+)
 
 st.divider()
 
-
-col1, col2 = st.columns(2)
-
+col1, col2, col3 = st.columns(3)
 
 with col1:
 
     st.metric(
         "Startvermögen Prognose",
-
-        format_chf(
-            start_gesamt
-        )
+        f"CHF {start_gesamt:,.0f}".replace(",", "'")
     )
-
 
 with col2:
 
     st.metric(
         "CSV – aktuelles Gesamtvermögen",
-
-        format_chf(
-            aktuelles_gesamtvermoegen
-        )
+        f"CHF {aktuelles_gesamtvermoegen:,.0f}".replace(",", "'")
     )
 
+with col3:
+
+    st.metric(
+        "Jährliche Sparrate",
+        f"CHF {sparrate_gesamt:,.0f}".replace(",", "'")
+    )
 
 # =========================================================
 # PROGNOSE BERECHNEN
@@ -615,19 +474,11 @@ jahre = list(
     )
 )
 
-
-werte1 = [
-    float(start1)
-]
-
-werte2 = [
-    float(start2)
-]
-
-werte3 = [
-    float(start3)
-]
-
+werte1 = [float(start1)]
+werte2 = [float(start2)]
+werte3 = [float(start3)]
+werte4 = [float(start4)]
+werte5 = [float(start5)]
 
 for jahr in range(
     aktuelles_jahr + 1,
@@ -640,13 +491,11 @@ for jahr in range(
         + sparrate1
     )
 
-
     neuer_wert2 = (
         werte2[-1]
         * (1 + rendite2 / 100)
         + sparrate2
     )
-
 
     neuer_wert3 = (
         werte3[-1]
@@ -654,19 +503,23 @@ for jahr in range(
         + sparrate3
     )
 
-
-    werte1.append(
-        neuer_wert1
+    neuer_wert4 = (
+        werte4[-1]
+        * (1 + rendite4 / 100)
+        + sparrate4
     )
 
-    werte2.append(
-        neuer_wert2
+    neuer_wert5 = (
+        werte5[-1]
+        * (1 + rendite5 / 100)
+        + sparrate5
     )
 
-    werte3.append(
-        neuer_wert3
-    )
-
+    werte1.append(neuer_wert1)
+    werte2.append(neuer_wert2)
+    werte3.append(neuer_wert3)
+    werte4.append(neuer_wert4)
+    werte5.append(neuer_wert5)
 
 # =========================================================
 # GESAMTVERMÖGEN
@@ -674,22 +527,22 @@ for jahr in range(
 
 gesamtwerte = [
 
-    a + b + c
+    a + b + c + d + e
 
-    for a, b, c in zip(
+    for a, b, c, d, e in zip(
         werte1,
         werte2,
-        werte3
+        werte3,
+        werte4,
+        werte5
     )
 ]
 
-
 # =========================================================
-# KAUFKRAFTBEREINIGUNG
+# KAUFKRAFT
 # =========================================================
 
 realwerte = []
-
 
 for i, wert in enumerate(
     gesamtwerte
@@ -707,9 +560,8 @@ for i, wert in enumerate(
         realwert
     )
 
-
 # =========================================================
-# PROGNOSE DATAFRAME
+# DATAFRAME
 # =========================================================
 
 prognose_df = pd.DataFrame({
@@ -722,70 +574,57 @@ prognose_df = pd.DataFrame({
 
     name3: werte3,
 
+    name4: werte4,
+
+    name5: werte5,
+
     "Gesamtvermögen": gesamtwerte,
 
     "Kaufkraftbereinigt": realwerte
-})
 
+})
 
 # =========================================================
 # ENDWERT
 # =========================================================
 
-endwert = gesamtwerte[-1]
+endwert = float(
+    gesamtwerte[-1]
+)
 
-real_endwert = realwerte[-1]
+real_endwert = float(
+    realwerte[-1]
+)
 
+st.divider()
 
 st.subheader(
     f"📅 Prognose {endjahr}"
 )
 
-
-col1, col2, col3, col4 = (
-    st.columns(4)
-)
-
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
 
     st.metric(
         "Gesamtvermögen",
-
-        format_chf(
-            endwert
-        )
+        f"CHF {endwert:,.0f}".replace(",", "'")
     )
-
 
 with col2:
 
     st.metric(
         "Kaufkraft",
-
-        format_chf(
-            real_endwert
-        )
+        f"CHF {real_endwert:,.0f}".replace(",", "'")
     )
-
 
 with col3:
 
-    gesamt_sparrate = (
-        sparrate1
-        + sparrate2
-        + sparrate3
-    )
-
     st.metric(
         "Gesamt Sparrate",
-
-        format_chf(
-            gesamt_sparrate
-        )
+        f"CHF {sparrate_gesamt:,.0f}".replace(",", "'")
         + " / Jahr"
     )
-
 
 with col4:
 
@@ -795,6 +634,8 @@ with col4:
             start1 * rendite1
             + start2 * rendite2
             + start3 * rendite3
+            + start4 * rendite4
+            + start5 * rendite5
         )
 
         / start_gesamt
@@ -804,13 +645,10 @@ with col4:
         else 0
     )
 
-
     st.metric(
         "Startgewichtete Rendite",
-
         f"{gewichtete_rendite:.2f} %"
     )
-
 
 # =========================================================
 # ZIELE
@@ -826,9 +664,7 @@ st.subheader(
 def zieljahr(ziel):
 
     treffer = prognose_df[
-        prognose_df[
-            "Gesamtvermögen"
-        ] >= ziel
+        prognose_df["Gesamtvermögen"] >= ziel
     ]
 
     if not treffer.empty:
@@ -852,11 +688,11 @@ jahr_2mio = zieljahr(
     2_000_000
 )
 
-
-col1, col2, col3 = (
-    st.columns(3)
+jahr_3mio = zieljahr(
+    3_000_000
 )
 
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
 
@@ -874,7 +710,6 @@ with col1:
             "nicht erreicht"
         )
 
-
 with col2:
 
     if jahr_1_5mio:
@@ -890,7 +725,6 @@ with col2:
             "CHF 1,5 Millionen",
             "nicht erreicht"
         )
-
 
 with col3:
 
@@ -908,6 +742,21 @@ with col3:
             "nicht erreicht"
         )
 
+with col4:
+
+    if jahr_3mio:
+
+        st.metric(
+            "CHF 3 Millionen",
+            jahr_3mio
+        )
+
+    else:
+
+        st.metric(
+            "CHF 3 Millionen",
+            "nicht erreicht"
+        )
 
 # =========================================================
 # GRAFIK
@@ -919,63 +768,72 @@ st.subheader(
     "📈 Vermögensentwicklung"
 )
 
-
 fig = go.Figure()
 
-
 # ---------------------------------------------------------
-# BEREICH 1
+# WERTSCHRIFTEN
 # ---------------------------------------------------------
 
 fig.add_trace(
     go.Scatter(
-
         x=jahre,
-
         y=werte1,
-
         mode="lines",
-
         name=name1
     )
 )
 
-
 # ---------------------------------------------------------
-# BEREICH 2
+# SPARVERMÖGEN
 # ---------------------------------------------------------
 
 fig.add_trace(
     go.Scatter(
-
         x=jahre,
-
         y=werte2,
-
         mode="lines",
-
         name=name2
     )
 )
 
-
 # ---------------------------------------------------------
-# BEREICH 3
+# LIQUIDE MITTEL
 # ---------------------------------------------------------
 
 fig.add_trace(
     go.Scatter(
-
         x=jahre,
-
         y=werte3,
-
         mode="lines",
-
         name=name3
     )
 )
 
+# ---------------------------------------------------------
+# LPP
+# ---------------------------------------------------------
+
+fig.add_trace(
+    go.Scatter(
+        x=jahre,
+        y=werte4,
+        mode="lines",
+        name=name4
+    )
+)
+
+# ---------------------------------------------------------
+# VORSORGE
+# ---------------------------------------------------------
+
+fig.add_trace(
+    go.Scatter(
+        x=jahre,
+        y=werte5,
+        mode="lines",
+        name=name5
+    )
+)
 
 # ---------------------------------------------------------
 # GESAMTVERMÖGEN
@@ -983,21 +841,13 @@ fig.add_trace(
 
 fig.add_trace(
     go.Scatter(
-
         x=jahre,
-
         y=gesamtwerte,
-
         mode="lines",
-
         name="Gesamtvermögen",
-
-        line=dict(
-            width=5
-        )
+        line=dict(width=5)
     )
 )
-
 
 # ---------------------------------------------------------
 # KAUFKRAFT
@@ -1005,47 +855,45 @@ fig.add_trace(
 
 fig.add_trace(
     go.Scatter(
-
         x=jahre,
-
         y=realwerte,
-
         mode="lines",
-
         name="Kaufkraftbereinigt",
-
         line=dict(
             dash="dot"
         )
     )
 )
 
-
-# ---------------------------------------------------------
-# ZIELE
-# ---------------------------------------------------------
+# =========================================================
+# ZIELLINIEN
+# =========================================================
 
 fig.add_hline(
     y=1_000_000,
-
     annotation_text="CHF 1 Mio.",
-
     annotation_position="top left"
 )
-
 
 fig.add_hline(
     y=2_000_000,
-
     annotation_text="CHF 2 Mio.",
-
     annotation_position="top left"
 )
 
+fig.add_hline(
+    y=3_000_000,
+    annotation_text="CHF 3 Mio.",
+    annotation_position="top left"
+)
+
+# =========================================================
+# GRAFIK LAYOUT
+# =========================================================
 
 fig.update_layout(
 
-    height=600,
+    height=650,
 
     xaxis_title="Jahr",
 
@@ -1053,7 +901,7 @@ fig.update_layout(
 
     hovermode="x unified",
 
-    legend_title="Bereich",
+    legend_title="Vermögensbereich",
 
     margin=dict(
         l=20,
@@ -1063,49 +911,100 @@ fig.update_layout(
     )
 )
 
-
 fig.update_yaxes(
     tickformat=",.0f"
 )
-
 
 st.plotly_chart(
     fig,
     use_container_width=True
 )
 
-
 # =========================================================
 # JAHRESÜBERSICHT
 # =========================================================
+
+st.divider()
 
 st.subheader(
     "📊 Jahresübersicht"
 )
 
-
 anzeige_df = prognose_df.copy()
-
 
 for spalte in anzeige_df.columns[1:]:
 
     anzeige_df[spalte] = (
-        anzeige_df[spalte].apply(
+        anzeige_df[spalte]
+        .apply(
             lambda x:
-                f"CHF {x:,.0f}"
-                .replace(",", "'")
+            f"CHF {x:,.0f}"
+            .replace(",", "'")
         )
     )
 
-
 st.dataframe(
     anzeige_df,
-
     use_container_width=True,
-
     hide_index=True
 )
 
+# =========================================================
+# ZUSAMMENFASSUNG
+# =========================================================
+
+st.divider()
+
+st.subheader(
+    "📌 Zusammenfassung"
+)
+
+gesamtwachstum = (
+    endwert - start_gesamt
+)
+
+gesamtwachstum_prozent = (
+
+    gesamtwachstum
+    / start_gesamt
+    * 100
+
+    if start_gesamt > 0
+
+    else 0
+)
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+
+    st.metric(
+        "Startvermögen",
+        f"CHF {start_gesamt:,.0f}"
+        .replace(",", "'")
+    )
+
+with col2:
+
+    st.metric(
+        "Zuwachs bis " + str(endjahr),
+        f"CHF {gesamtwachstum:,.0f}"
+        .replace(",", "'"),
+        f"{gesamtwachstum_prozent:+.1f} %"
+    )
+
+with col3:
+
+    gesamteinzahlungen = (
+        sparrate_gesamt
+        * (endjahr - aktuelles_jahr)
+    )
+
+    st.metric(
+        "Einzahlungen gesamt",
+        f"CHF {gesamteinzahlungen:,.0f}"
+        .replace(",", "'")
+    )
 
 # =========================================================
 # ABSCHLUSS
@@ -1114,8 +1013,8 @@ st.dataframe(
 st.divider()
 
 st.caption(
-    "Die Prognose basiert auf den von dir eingegebenen "
-    "Sparraten und erwarteten Renditen. Sie dient als "
-    "Orientierung und stellt keine Anlageberatung oder "
-    "Garantie dar."
+    "Die Prognose basiert auf den eingegebenen "
+    "Startvermögen, Sparraten, Renditeannahmen und "
+    "der Inflation. Sie dient als Orientierung und "
+    "stellt keine Anlageberatung oder Garantie dar."
 )
