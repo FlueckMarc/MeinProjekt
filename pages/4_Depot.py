@@ -2,8 +2,7 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 from pathlib import Path
-from datetime import datetime, date, timedelta
-import os
+from datetime import date
 
 # =========================================================
 # SEITENKONFIGURATION
@@ -24,6 +23,7 @@ BASE_DIR = Path(__file__).parent.parent
 HISTORIE_FILE = BASE_DIR / "depot_historie.csv"
 FIND_FILE = BASE_DIR / "findependent_historie.csv"
 AKTUELL_FILE = BASE_DIR / "depot_aktuell.csv"
+FONDS_FILE = BASE_DIR / "fonds_historie.csv"
 
 
 # =========================================================
@@ -32,9 +32,9 @@ AKTUELL_FILE = BASE_DIR / "depot_aktuell.csv"
 
 positionen = [
 
-    # -----------------------------------------------------
+    # =====================================================
     # SWISSQUOTE
-    # -----------------------------------------------------
+    # =====================================================
 
     {
         "Depot": "Swissquote",
@@ -208,9 +208,9 @@ positionen = [
     },
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # HYPOTHEKARBANK
-    # -----------------------------------------------------
+    # =====================================================
 
     {
         "Depot": "Hypi",
@@ -253,9 +253,14 @@ def format_percent(wert):
     return f"{wert:+.2f} %"
 
 
+# =========================================================
+# KURS LADEN
+# =========================================================
+
 def lade_kurs(ticker):
 
     try:
+
         data = yf.Ticker(ticker).history(
             period="5d",
             auto_adjust=False
@@ -272,8 +277,13 @@ def lade_kurs(ticker):
         return float(close.iloc[-1])
 
     except Exception:
+
         return None
 
+
+# =========================================================
+# WECHSELKURS
+# =========================================================
 
 def lade_wechselkurs(von):
 
@@ -282,13 +292,11 @@ def lade_wechselkurs(von):
 
     ticker = f"{von}CHF=X"
 
-    kurs = lade_kurs(ticker)
-
-    return kurs
+    return lade_kurs(ticker)
 
 
 # =========================================================
-# KURSE AKTUALISIEREN
+# DEPOT AKTUALISIEREN
 # =========================================================
 
 @st.cache_data(ttl=300)
@@ -300,72 +308,120 @@ def aktualisiere_depot():
         "CHF": 1.0
     }
 
-    for waehrung in ["USD", "EUR", "GBP", "CAD"]:
+    for waehrung in [
+        "USD",
+        "EUR",
+        "GBP",
+        "CAD"
+    ]:
 
-        kurs = lade_wechselkurs(waehrung)
+        kurs = lade_wechselkurs(
+            waehrung
+        )
 
         if kurs is not None:
+
             waehrungen[waehrung] = kurs
+
 
     for pos in positionen:
 
-        kurs = lade_kurs(pos["Ticker"])
+        kurs = lade_kurs(
+            pos["Ticker"]
+        )
 
         if kurs is None:
-            kurs = 0
+
+            kurs = 0.0
+
 
         wechselkurs = waehrungen.get(
             pos["Währung"],
-            1
+            1.0
         )
+
 
         wert_original = (
-            pos["Anteile"] * kurs
+            pos["Anteile"]
+            * kurs
         )
+
 
         wert_chf = (
-            wert_original * wechselkurs
+            wert_original
+            * wechselkurs
         )
+
 
         einstand_original = (
-            pos["Anteile"] *
-            pos["Einstand"]
+            pos["Anteile"]
+            * pos["Einstand"]
         )
+
 
         einstand_chf = (
-            einstand_original *
-            wechselkurs
+            einstand_original
+            * wechselkurs
         )
 
+
         gewinn = (
-            wert_chf - einstand_chf
+            wert_chf
+            - einstand_chf
         )
+
+
+        gewinn_prozent = (
+
+            gewinn
+            / einstand_chf
+            * 100
+
+            if einstand_chf != 0
+            else 0
+        )
+
 
         ergebnisse.append({
 
             "Depot": pos["Depot"],
+
             "Name": pos["Name"],
+
             "Ticker": pos["Ticker"],
+
             "Anteile": pos["Anteile"],
+
             "Einstand": pos["Einstand"],
+
             "Kurs": kurs,
+
             "Währung": pos["Währung"],
+
             "FX": wechselkurs,
-            "Wert Original": wert_original,
-            "Wert CHF": wert_chf,
-            "Gewinn CHF": gewinn,
-            "Gewinn %": (
-                gewinn / einstand_chf * 100
-                if einstand_chf != 0
-                else 0
-            )
+
+            "Wert Original":
+                wert_original,
+
+            "Wert CHF":
+                wert_chf,
+
+            "Gewinn CHF":
+                gewinn,
+
+            "Gewinn %":
+                gewinn_prozent
         })
 
-    return pd.DataFrame(ergebnisse), waehrungen
+
+    return (
+        pd.DataFrame(ergebnisse),
+        waehrungen
+    )
 
 
 # =========================================================
-# HISTORIE LADEN
+# DEPOTHISTORIE
 # =========================================================
 
 def lade_historie():
@@ -373,7 +429,10 @@ def lade_historie():
     if HISTORIE_FILE.exists():
 
         try:
-            df = pd.read_csv(HISTORIE_FILE)
+
+            df = pd.read_csv(
+                HISTORIE_FILE
+            )
 
             if not df.empty:
 
@@ -384,7 +443,9 @@ def lade_historie():
                 return df
 
         except Exception:
+
             pass
+
 
     return pd.DataFrame(
         columns=[
@@ -401,39 +462,60 @@ def lade_historie():
 
 def speichere_historie(
     depotwert,
-    einzahlung=0
+    einzahlung=0,
+    datum=None
 ):
 
     df = lade_historie()
 
-    heute = pd.Timestamp.now().normalize()
+    if datum is None:
+
+        datum = pd.Timestamp.now().normalize()
+
+    else:
+
+        datum = pd.to_datetime(
+            datum
+        ).normalize()
+
 
     neuer_eintrag = pd.DataFrame({
 
-        "Datum": [heute],
+        "Datum": [
+            datum
+        ],
 
         "Depotwert": [
-            depotwert
+            float(depotwert)
         ],
 
         "Einzahlung": [
-            einzahlung
+            float(einzahlung)
         ]
     })
+
 
     if not df.empty:
 
         df = df[
             df["Datum"].dt.normalize()
-            != heute
+            != datum
         ]
 
+
     df = pd.concat(
-        [df, neuer_eintrag],
+        [
+            df,
+            neuer_eintrag
+        ],
         ignore_index=True
     )
 
-    df = df.sort_values("Datum")
+
+    df = df.sort_values(
+        "Datum"
+    )
+
 
     df.to_csv(
         HISTORIE_FILE,
@@ -450,7 +532,10 @@ def lade_findependent():
     if FIND_FILE.exists():
 
         try:
-            df = pd.read_csv(FIND_FILE)
+
+            df = pd.read_csv(
+                FIND_FILE
+            )
 
             if not df.empty:
 
@@ -461,7 +546,9 @@ def lade_findependent():
                 return df
 
         except Exception:
+
             pass
+
 
     return pd.DataFrame(
         columns=[
@@ -472,6 +559,10 @@ def lade_findependent():
     )
 
 
+# =========================================================
+# FINDINDEPENDENT SPEICHERN
+# =========================================================
+
 def speichere_findependent(
     datum,
     wert,
@@ -480,6 +571,7 @@ def speichere_findependent(
 
     df = lade_findependent()
 
+
     neuer_eintrag = pd.DataFrame({
 
         "Datum": [
@@ -487,23 +579,129 @@ def speichere_findependent(
         ],
 
         "Wert": [
-            wert
+            float(wert)
         ],
 
         "Einzahlung": [
-            einzahlung
+            float(einzahlung)
         ]
     })
 
+
     df = pd.concat(
-        [df, neuer_eintrag],
+        [
+            df,
+            neuer_eintrag
+        ],
         ignore_index=True
     )
 
-    df = df.sort_values("Datum")
+
+    df = df.sort_values(
+        "Datum"
+    )
+
 
     df.to_csv(
         FIND_FILE,
+        index=False
+    )
+
+
+# =========================================================
+# FONDS HISTORIE
+# =========================================================
+
+def lade_fonds():
+
+    if FONDS_FILE.exists():
+
+        try:
+
+            df = pd.read_csv(
+                FONDS_FILE
+            )
+
+            if not df.empty:
+
+                df["Datum"] = pd.to_datetime(
+                    df["Datum"]
+                )
+
+                return df
+
+        except Exception:
+
+            pass
+
+
+    return pd.DataFrame(
+        columns=[
+            "Datum",
+            "UBS",
+            "BCV"
+        ]
+    )
+
+
+# =========================================================
+# FONDS SPEICHERN
+# =========================================================
+
+def speichere_fonds(
+    datum,
+    ubs,
+    bcv
+):
+
+    df = lade_fonds()
+
+
+    datum = pd.to_datetime(
+        datum
+    ).normalize()
+
+
+    neuer_eintrag = pd.DataFrame({
+
+        "Datum": [
+            datum
+        ],
+
+        "UBS": [
+            float(ubs)
+        ],
+
+        "BCV": [
+            float(bcv)
+        ]
+    })
+
+
+    if not df.empty:
+
+        df = df[
+            df["Datum"].dt.normalize()
+            != datum
+        ]
+
+
+    df = pd.concat(
+        [
+            df,
+            neuer_eintrag
+        ],
+        ignore_index=True
+    )
+
+
+    df = df.sort_values(
+        "Datum"
+    )
+
+
+    df.to_csv(
+        FONDS_FILE,
         index=False
     )
 
@@ -519,11 +717,15 @@ st.caption(
     "Performance deines gesamten Depots"
 )
 
+
 # =========================================================
 # AKTUALISIEREN
 # =========================================================
 
-col1, col2 = st.columns([1, 4])
+col1, col2 = st.columns(
+    [1, 4]
+)
+
 
 with col1:
 
@@ -536,52 +738,74 @@ with col1:
 
         st.rerun()
 
+
 # =========================================================
 # KURSE LADEN
 # =========================================================
 
-df, wechselkurse = aktualisiere_depot()
+df, wechselkurse = (
+    aktualisiere_depot()
+)
+
 
 # =========================================================
-# FINDINDEPENDENT EINGABE
+# FINDINDEPENDENT
 # =========================================================
 
 find_df = lade_findependent()
 
-st.subheader("🤖 Findependent")
+
+st.subheader(
+    "🤖 Findependent"
+)
+
 
 col1, col2, col3 = st.columns(3)
+
 
 with col1:
 
     find_datum = st.date_input(
         "Datum",
-        value=date.today()
+        value=date.today(),
+        key="find_datum"
     )
+
 
 with col2:
 
-    letzter_find = (
-        float(find_df["Wert"].iloc[-1])
-        if not find_df.empty
-        else 0
-    )
+    if not find_df.empty:
+
+        letzter_find = float(
+            find_df["Wert"].iloc[-1]
+        )
+
+    else:
+
+        letzter_find = 0.0
+
 
     find_wert = st.number_input(
         "Aktueller Wert",
         min_value=0.0,
-        value=letzter_find,
-        step=100.0
+        max_value=10_000_000.0,
+        value=float(letzter_find),
+        step=100.0,
+        key="find_wert"
     )
+
 
 with col3:
 
     find_einzahlung = st.number_input(
         "Neue Einzahlung",
         min_value=0.0,
+        max_value=10_000_000.0,
         value=0.0,
-        step=100.0
+        step=100.0,
+        key="find_einzahlung"
     )
+
 
 if st.button(
     "💾 Findependent speichern"
@@ -601,7 +825,7 @@ if st.button(
 
 
 # =========================================================
-# FINDINDEPENDENT WERT
+# AKTUELLER FINDINDEPENDENT WERT
 # =========================================================
 
 if not find_df.empty:
@@ -612,7 +836,7 @@ if not find_df.empty:
 
 else:
 
-    findependent_wert = 0
+    findependent_wert = 0.0
 
 
 # =========================================================
@@ -624,44 +848,93 @@ depotwerte = (
     .sum()
 )
 
+
 swissquote = float(
     depotwerte.get(
         "Swissquote",
-        0
+        0.0
     )
 )
+
 
 hypi = float(
     depotwerte.get(
         "Hypi",
-        0
+        0.0
     )
 )
 
-# UBS und BCV Fonds manuell
-# Diese Werte kannst du direkt hier eingeben.
 
-st.subheader("🏦 Fonds")
+# =========================================================
+# UBS / BCV FONDS
+# =========================================================
+
+fonds_df = lade_fonds()
+
+
+if not fonds_df.empty:
+
+    letzter_ubs = float(
+        fonds_df["UBS"].iloc[-1]
+    )
+
+    letzter_bcv = float(
+        fonds_df["BCV"].iloc[-1]
+    )
+
+else:
+
+    letzter_ubs = 0.0
+    letzter_bcv = 0.0
+
+
+st.subheader(
+    "🏦 Fonds"
+)
+
 
 col1, col2 = st.columns(2)
+
 
 with col1:
 
     ubs_fonds = st.number_input(
         "UBS Fonds – Gesamtwert CHF",
         min_value=0.0,
-        value=0.0,
-        step=1000.0
+        max_value=10_000_000.0,
+        value=float(letzter_ubs),
+        step=1000.0,
+        key="ubs_fonds"
     )
+
 
 with col2:
 
     bcv_fonds = st.number_input(
         "BCV Fonds – Gesamtwert CHF",
         min_value=0.0,
-        value=0.0,
-        step=1000.0
+        max_value=10_000_000.0,
+        value=float(letzter_bcv),
+        step=1000.0,
+        key="bcv_fonds"
     )
+
+
+if st.button(
+    "💾 Fondswerte speichern"
+):
+
+    speichere_fonds(
+        date.today(),
+        ubs_fonds,
+        bcv_fonds
+    )
+
+    st.success(
+        "UBS- und BCV-Werte gespeichert."
+    )
+
+    st.rerun()
 
 
 # =========================================================
@@ -669,6 +942,7 @@ with col2:
 # =========================================================
 
 gesamtdepot = (
+
     swissquote
     + hypi
     + ubs_fonds
@@ -678,40 +952,53 @@ gesamtdepot = (
 
 
 # =========================================================
-# OBERE KARTEN
+# DEPOTÜBERSICHT
 # =========================================================
 
 st.divider()
 
-st.subheader("💰 Depotübersicht")
+st.subheader(
+    "💰 Depotübersicht"
+)
+
 
 c1, c2, c3, c4, c5 = st.columns(5)
 
+
 with c1:
+
     st.metric(
         "Swissquote",
         format_chf(swissquote)
     )
 
+
 with c2:
+
     st.metric(
         "Hypi",
         format_chf(hypi)
     )
 
+
 with c3:
+
     st.metric(
         "UBS",
         format_chf(ubs_fonds)
     )
 
+
 with c4:
+
     st.metric(
         "BCV",
         format_chf(bcv_fonds)
     )
 
+
 with c5:
+
     st.metric(
         "Findependent",
         format_chf(findependent_wert)
@@ -720,6 +1007,7 @@ with c5:
 
 st.divider()
 
+
 st.metric(
     "💰 GESAMTDEPOT",
     format_chf(gesamtdepot)
@@ -727,7 +1015,7 @@ st.metric(
 
 
 # =========================================================
-# HISTORIE AKTUALISIEREN
+# AKTUELLEN DEPOTWERT SPEICHERN
 # =========================================================
 
 speichere_historie(
@@ -740,9 +1028,13 @@ speichere_historie(
 # EINZAHLUNGEN
 # =========================================================
 
-st.subheader("💵 Einzahlung erfassen")
+st.subheader(
+    "💵 Einzahlung erfassen"
+)
+
 
 col1, col2 = st.columns(2)
+
 
 with col1:
 
@@ -752,15 +1044,18 @@ with col1:
         key="einzahlung_datum"
     )
 
+
 with col2:
 
     einzahlung = st.number_input(
         "Einzahlung CHF",
         min_value=0.0,
+        max_value=10_000_000.0,
         value=0.0,
         step=100.0,
         key="einzahlung"
     )
+
 
 if st.button(
     "➕ Einzahlung speichern"
@@ -770,7 +1065,8 @@ if st.button(
 
         speichere_historie(
             gesamtdepot,
-            einzahlung
+            einzahlung,
+            einzahlung_datum
         )
 
         st.success(
@@ -786,19 +1082,23 @@ if st.button(
 
 st.divider()
 
-st.subheader("📊 Performance")
+st.subheader(
+    "📊 Performance"
+)
+
 
 hist = lade_historie()
 
+
 if len(hist) >= 2:
 
-    hist = hist.sort_values("Datum")
+    hist = hist.sort_values(
+        "Datum"
+    )
+
 
     heute = hist["Datum"].max()
 
-    # -----------------------------------------------------
-    # ZEITRAUM AUSWAHL
-    # -----------------------------------------------------
 
     zeitraum = st.radio(
         "Zeitraum",
@@ -812,22 +1112,26 @@ if len(hist) >= 2:
         index=1
     )
 
+
     if zeitraum == "Woche":
 
-        startdatum = heute - pd.Timedelta(
-            days=7
+        startdatum = (
+            heute
+            - pd.Timedelta(days=7)
         )
 
     elif zeitraum == "Monat":
 
-        startdatum = heute - pd.Timedelta(
-            days=30
+        startdatum = (
+            heute
+            - pd.Timedelta(days=30)
         )
 
     elif zeitraum == "Jahr":
 
-        startdatum = heute - pd.Timedelta(
-            days=365
+        startdatum = (
+            heute
+            - pd.Timedelta(days=365)
         )
 
     else:
@@ -838,9 +1142,11 @@ if len(hist) >= 2:
             day=1
         )
 
+
     periode = hist[
         hist["Datum"] >= startdatum
     ].copy()
+
 
     if len(periode) >= 2:
 
@@ -848,13 +1154,16 @@ if len(hist) >= 2:
             periode["Depotwert"].iloc[0]
         )
 
+
         endwert = float(
             periode["Depotwert"].iloc[-1]
         )
 
+
         einzahlungen = float(
             periode["Einzahlung"].sum()
         )
+
 
         echter_gewinn = (
             endwert
@@ -862,18 +1171,26 @@ if len(hist) >= 2:
             - einzahlungen
         )
 
+
         basis = (
             startwert
             + einzahlungen
         )
 
+
         performance_prozent = (
-            echter_gewinn / basis * 100
+
+            echter_gewinn
+            / basis
+            * 100
+
             if basis != 0
             else 0
         )
 
+
         c1, c2, c3 = st.columns(3)
+
 
         with c1:
 
@@ -882,12 +1199,14 @@ if len(hist) >= 2:
                 format_chf(endwert)
             )
 
+
         with c2:
 
             st.metric(
                 "Einzahlungen",
                 format_chf(einzahlungen)
             )
+
 
         with c3:
 
@@ -899,9 +1218,10 @@ if len(hist) >= 2:
                 )
             )
 
-        # -------------------------------------------------
+
+        # =================================================
         # PERFORMANCE GRAFIK
-        # -------------------------------------------------
+        # =================================================
 
         chart_df = periode[
             [
@@ -910,9 +1230,11 @@ if len(hist) >= 2:
             ]
         ].copy()
 
+
         chart_df = chart_df.set_index(
             "Datum"
         )
+
 
         st.line_chart(
             chart_df,
@@ -920,12 +1242,14 @@ if len(hist) >= 2:
             use_container_width=True
         )
 
+
     else:
 
         st.info(
             "Für diesen Zeitraum sind noch "
             "nicht genügend historische Werte vorhanden."
         )
+
 
 else:
 
@@ -942,30 +1266,45 @@ else:
 
 st.divider()
 
-st.subheader("📋 Einzelpositionen")
+st.subheader(
+    "📋 Einzelpositionen"
+)
+
 
 anzeige = df.copy()
 
+
 anzeige["Kurs"] = anzeige.apply(
+
     lambda row:
-    f"{row['Kurs']:,.2f} {row['Währung']}"
-    .replace(",", "'"),
+        f"{row['Kurs']:,.2f} "
+        f"{row['Währung']}"
+        .replace(",", "'"),
+
     axis=1
 )
 
-anzeige["Wert CHF"] = anzeige[
-    "Wert CHF"
-].apply(format_chf)
 
-anzeige["Gewinn CHF"] = anzeige[
-    "Gewinn CHF"
-].apply(format_chf)
-
-anzeige["Gewinn %"] = anzeige[
-    "Gewinn %"
-].apply(
-    lambda x: f"{x:+.2f} %"
+anzeige["Wert CHF"] = (
+    anzeige["Wert CHF"]
+    .apply(format_chf)
 )
+
+
+anzeige["Gewinn CHF"] = (
+    anzeige["Gewinn CHF"]
+    .apply(format_chf)
+)
+
+
+anzeige["Gewinn %"] = (
+    anzeige["Gewinn %"]
+    .apply(
+        lambda x:
+        f"{x:+.2f} %"
+    )
+)
+
 
 anzeige = anzeige[
     [
@@ -978,6 +1317,7 @@ anzeige = anzeige[
         "Gewinn %"
     ]
 ]
+
 
 st.dataframe(
     anzeige,
@@ -992,24 +1332,39 @@ st.dataframe(
 
 st.divider()
 
-st.subheader("💱 Wechselkurse")
+st.subheader(
+    "💱 Wechselkurse"
+)
+
 
 fx_data = []
+
 
 for waehrung, kurs in wechselkurse.items():
 
     fx_data.append({
-        "Währung": waehrung,
-        "CHF-Kurs": kurs
+
+        "Währung":
+            waehrung,
+
+        "CHF-Kurs":
+            kurs
     })
 
-fx_df = pd.DataFrame(fx_data)
 
-fx_df["CHF-Kurs"] = fx_df[
-    "CHF-Kurs"
-].apply(
-    lambda x: f"{x:.4f}"
+fx_df = pd.DataFrame(
+    fx_data
 )
+
+
+fx_df["CHF-Kurs"] = (
+    fx_df["CHF-Kurs"]
+    .apply(
+        lambda x:
+        f"{x:.4f}"
+    )
+)
+
 
 st.dataframe(
     fx_df,
@@ -1039,8 +1394,8 @@ with st.expander(
 
     `Endwert − Anfangswert − Einzahlungen`
 
-    Dadurch werden zusätzliche Einzahlungen **nicht als
-    Anlagegewinn** betrachtet.
+    Dadurch werden zusätzliche Einzahlungen nicht als
+    Anlagegewinn betrachtet.
 
     Beispiel:
 
@@ -1061,7 +1416,7 @@ with st.expander(
 
 
 # =========================================================
-# DATENEXPORT / VERKNÜPFUNG
+# AKTUELLER DEPOTWERT FÜR VERMÖGEN / PROGNOSE
 # =========================================================
 
 aktuell = pd.DataFrame({
@@ -1095,11 +1450,18 @@ aktuell = pd.DataFrame({
     ]
 })
 
+
 aktuell.to_csv(
     AKTUELL_FILE,
     index=False
 )
 
+
+# =========================================================
+# ABSCHLUSS
+# =========================================================
+
+st.divider()
 
 st.caption(
     "Die Marktdaten werden beim Aktualisieren der App "
