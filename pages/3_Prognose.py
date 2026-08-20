@@ -140,7 +140,7 @@ with col1:
         "Prognose bis",
         min_value=aktuelles_jahr + 1,
         max_value=2070,
-        value=2050,
+        value=2045,
         step=1
     )
 
@@ -192,8 +192,8 @@ with st.container(border=True):
             "Startvermögen CHF",
             min_value=0.0,
             max_value=10_000_000.0,
-            value=160_000.0,
-            step=5_000.0,
+            value=194_000.0,
+            step=1_000.0,
             key="start1"
         )
 
@@ -203,7 +203,7 @@ with st.container(border=True):
             "Sparrate pro Jahr CHF",
             min_value=0.0,
             max_value=1_000_000.0,
-            value=20_000.0,
+            value=24_000.0,
             step=1_000.0,
             key="sparrate1"
         )
@@ -212,7 +212,7 @@ with st.container(border=True):
         "Erwartete Rendite",
         min_value=0.0,
         max_value=15.0,
-        value=5.0,
+        value=4.0,
         step=0.5,
         format="%.1f %%",
         key="rendite1"
@@ -242,7 +242,7 @@ with st.container(border=True):
             "Startvermögen CHF",
             min_value=0.0,
             max_value=10_000_000.0,
-            value=100_000.0,
+            value=240_000.0,
             step=5_000.0,
             key="start2"
         )
@@ -253,7 +253,7 @@ with st.container(border=True):
             "Sparrate pro Jahr CHF",
             min_value=0.0,
             max_value=1_000_000.0,
-            value=10_000.0,
+            value=24_000.0,
             step=1_000.0,
             key="sparrate2"
         )
@@ -262,7 +262,7 @@ with st.container(border=True):
         "Erwartete Rendite",
         min_value=0.0,
         max_value=15.0,
-        value=1.5,
+        value=1.0,
         step=0.5,
         format="%.1f %%",
         key="rendite2"
@@ -292,8 +292,8 @@ with st.container(border=True):
             "Startvermögen CHF",
             min_value=0.0,
             max_value=10_000_000.0,
-            value=200_000.0,
-            step=5_000.0,
+            value=14_000.0,
+            step=1_000.0,
             key="start3"
         )
 
@@ -312,7 +312,7 @@ with st.container(border=True):
         "Erwartete Rendite",
         min_value=0.0,
         max_value=15.0,
-        value=1.0,
+        value=0.0,
         step=0.5,
         format="%.1f %%",
         key="rendite3"
@@ -342,7 +342,7 @@ with st.container(border=True):
             "Startvermögen CHF",
             min_value=0.0,
             max_value=10_000_000.0,
-            value=400_000.0,
+            value=392_000.0,
             step=5_000.0,
             key="start4"
         )
@@ -353,7 +353,7 @@ with st.container(border=True):
             "Sparrate pro Jahr CHF",
             min_value=0.0,
             max_value=1_000_000.0,
-            value=15_000.0,
+            value=25_000.0,
             step=1_000.0,
             key="sparrate4"
         )
@@ -362,7 +362,7 @@ with st.container(border=True):
         "Erwartete Rendite",
         min_value=0.0,
         max_value=15.0,
-        value=3.0,
+        value=2.0,
         step=0.5,
         format="%.1f %%",
         key="rendite4"
@@ -392,7 +392,7 @@ with st.container(border=True):
             "Startvermögen CHF",
             min_value=0.0,
             max_value=10_000_000.0,
-            value=100_000.0,
+            value=138_000.0,
             step=5_000.0,
             key="start5"
         )
@@ -403,7 +403,7 @@ with st.container(border=True):
             "Sparrate pro Jahr CHF",
             min_value=0.0,
             max_value=1_000_000.0,
-            value=10_000.0,
+            value=7_000.0,
             step=1_000.0,
             key="sparrate5"
         )
@@ -412,7 +412,7 @@ with st.container(border=True):
         "Erwartete Rendite",
         min_value=0.0,
         max_value=15.0,
-        value=3.0,
+        value=2.0,
         step=0.5,
         format="%.1f %%",
         key="rendite5"
