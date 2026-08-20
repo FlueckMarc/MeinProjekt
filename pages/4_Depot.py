@@ -3,6 +3,8 @@ import pandas as pd
 import yfinance as yf
 from pathlib import Path
 from datetime import date
+import requests
+import re
 
 
 # =========================================================
@@ -23,7 +25,6 @@ st.set_page_config(
 BASE_DIR = Path(__file__).parent.parent
 
 HISTORIE_FILE = BASE_DIR / "depot_historie.csv"
-EINZAHLUNGEN_FILE = BASE_DIR / "einzahlungen.csv"
 FIND_FILE = BASE_DIR / "findependent_historie.csv"
 AKTUELL_FILE = BASE_DIR / "depot_aktuell.csv"
 FONDS_FILE = BASE_DIR / "fonds_historie.csv"
@@ -258,18 +259,20 @@ positionen = [
 # =========================================================
 
 def format_chf(wert):
+
     return f"CHF {wert:,.0f}".replace(",", "'")
 
 
 def format_percent(wert):
+
     return f"{wert:+.2f} %"
 
 
 # =========================================================
-# KURS LADEN
+# KURS MIT YFINANCE LADEN
 # =========================================================
 
-def lade_kurs(ticker):
+def lade_kurs_yfinance(ticker):
 
     try:
 
@@ -278,19 +281,176 @@ def lade_kurs(ticker):
             auto_adjust=False
         )
 
-        if data.empty:
-            return None
+        if not data.empty:
 
-        close = data["Close"].dropna()
+            close = data["Close"].dropna()
 
-        if close.empty:
-            return None
+            if not close.empty:
 
-        return float(close.iloc[-1])
+                return float(close.iloc[-1])
 
     except Exception:
 
+        pass
+
+    return None
+
+
+# =========================================================
+# ROBOTICS & AI ÜBER EXTERNE DATENQUELLE
+# =========================================================
+
+def lade_robotics_kurs():
+
+    try:
+
+        url = (
+            "https://www.finanzen.ch/derivate/"
+            "ch0467720428"
+        )
+
+        headers = {
+            "User-Agent":
+                "Mozilla/5.0 "
+                "(Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 "
+                "Chrome/151.0 Safari/537.36"
+        }
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=10
+        )
+
+        if response.status_code != 200:
+
+            return None
+
+        text = response.text
+
+        # Suche nach einem Preis in USD.
+        # Die Seite enthält typischerweise
+        # Bid / Ask / Last.
+
+        pattern = r"(\d{2,3}\.\d{2,3})\s*USD"
+
+        matches = re.findall(
+            pattern,
+            text
+        )
+
+        if matches:
+
+            werte = []
+
+            for match in matches:
+
+                try:
+
+                    wert = float(match)
+
+                    if 50 < wert < 1000:
+
+                        werte.append(wert)
+
+                except Exception:
+
+                    continue
+
+            if werte:
+
+                return float(
+                    werte[0]
+                )
+
+    except Exception:
+
+        pass
+
+    return None
+
+
+# =========================================================
+# KURS LADEN
+# =========================================================
+
+def lade_kurs(ticker):
+
+    # -----------------------------------------------------
+    # ROBOTICS & AI
+    # -----------------------------------------------------
+
+    if ticker == "ROBTTQ":
+
+        # Versuch 1
+        kurs = lade_kurs_yfinance(
+            "ROBTTQ"
+        )
+
+        if kurs is not None and kurs > 0:
+
+            return kurs
+
+        # Versuch 2
+        kurs = lade_kurs_yfinance(
+            "ROBTTQ.SW"
+        )
+
+        if kurs is not None and kurs > 0:
+
+            return kurs
+
+        # Versuch 3
+        kurs = lade_robotics_kurs()
+
+        if kurs is not None and kurs > 0:
+
+            return kurs
+
         return None
+
+
+    # -----------------------------------------------------
+    # ROCHE
+    # -----------------------------------------------------
+
+    if ticker == "ROG.SW":
+
+        alternative_ticker = [
+
+            "ROG.SW",
+            "ROP.SW",
+            "RO.SW"
+
+        ]
+
+        for alternative in alternative_ticker:
+
+            kurs = lade_kurs_yfinance(
+                alternative
+            )
+
+            if kurs is not None and kurs > 0:
+
+                return kurs
+
+        return None
+
+
+    # -----------------------------------------------------
+    # NORMALE TITEL
+    # -----------------------------------------------------
+
+    kurs = lade_kurs_yfinance(
+        ticker
+    )
+
+    if kurs is not None and kurs > 0:
+
+        return kurs
+
+    return None
 
 
 # =========================================================
@@ -300,11 +460,16 @@ def lade_kurs(ticker):
 def lade_wechselkurs(von):
 
     if von == "CHF":
+
         return 1.0
 
     ticker = f"{von}CHF=X"
 
-    return lade_kurs(ticker)
+    kurs = lade_kurs_yfinance(
+        ticker
+    )
+
+    return kurs
 
 
 # =========================================================
@@ -320,6 +485,11 @@ def aktualisiere_depot():
         "CHF": 1.0
     }
 
+
+    # -----------------------------------------------------
+    # WECHSELKURSE
+    # -----------------------------------------------------
+
     for waehrung in [
         "USD",
         "EUR",
@@ -327,11 +497,18 @@ def aktualisiere_depot():
         "CAD"
     ]:
 
-        kurs = lade_wechselkurs(waehrung)
+        kurs = lade_wechselkurs(
+            waehrung
+        )
 
         if kurs is not None:
+
             waehrungen[waehrung] = kurs
 
+
+    # -----------------------------------------------------
+    # POSITIONEN
+    # -----------------------------------------------------
 
     for pos in positionen:
 
@@ -339,8 +516,10 @@ def aktualisiere_depot():
             pos["Ticker"]
         )
 
+        # Kein künstlicher Kurs von 0
         if kurs is None:
-            kurs = 0.0
+
+            kurs = float("nan")
 
 
         wechselkurs = waehrungen.get(
@@ -392,18 +571,41 @@ def aktualisiere_depot():
 
         ergebnisse.append({
 
-            "Depot": pos["Depot"],
-            "Name": pos["Name"],
-            "Ticker": pos["Ticker"],
-            "Anteile": pos["Anteile"],
-            "Einstand": pos["Einstand"],
-            "Kurs": kurs,
-            "Währung": pos["Währung"],
-            "FX": wechselkurs,
-            "Wert Original": wert_original,
-            "Wert CHF": wert_chf,
-            "Gewinn CHF": gewinn,
-            "Gewinn %": gewinn_prozent
+            "Depot":
+                pos["Depot"],
+
+            "Name":
+                pos["Name"],
+
+            "Ticker":
+                pos["Ticker"],
+
+            "Anteile":
+                pos["Anteile"],
+
+            "Einstand":
+                pos["Einstand"],
+
+            "Kurs":
+                kurs,
+
+            "Währung":
+                pos["Währung"],
+
+            "FX":
+                wechselkurs,
+
+            "Wert Original":
+                wert_original,
+
+            "Wert CHF":
+                wert_chf,
+
+            "Gewinn CHF":
+                gewinn,
+
+            "Gewinn %":
+                gewinn_prozent
         })
 
 
@@ -433,9 +635,24 @@ def lade_historie():
                     df["Datum"]
                 )
 
-                df["Depotwert"] = pd.to_numeric(
-                    df["Depotwert"],
+                # Alte CSV kompatibel machen
+                if "Einzahlung Konto" not in df.columns:
+
+                    df["Einzahlung Konto"] = ""
+
+                if "Einzahlung" not in df.columns:
+
+                    df["Einzahlung"] = 0.0
+
+                df["Einzahlung"] = pd.to_numeric(
+                    df["Einzahlung"],
                     errors="coerce"
+                ).fillna(0.0)
+
+                df["Einzahlung Konto"] = (
+                    df["Einzahlung Konto"]
+                    .fillna("")
+                    .astype(str)
                 )
 
                 return df
@@ -448,21 +665,30 @@ def lade_historie():
     return pd.DataFrame(
         columns=[
             "Datum",
-            "Depotwert"
+            "Depotwert",
+            "Einzahlung",
+            "Einzahlung Konto"
         ]
     )
 
 
 # =========================================================
-# DEPOTWERT SPEICHERN
+# HISTORIE SPEICHERN
 # =========================================================
 
-def speichere_depotwert(
+def speichere_historie(
     depotwert,
-    datum=None
+    einzahlung=0.0,
+    datum=None,
+    konto=""
 ):
 
     df = lade_historie()
+
+
+    # -----------------------------------------------------
+    # DATUM
+    # -----------------------------------------------------
 
     if datum is None:
 
@@ -475,6 +701,69 @@ def speichere_depotwert(
         ).normalize()
 
 
+    einzahlung = float(
+        einzahlung
+    )
+
+
+    # -----------------------------------------------------
+    # EXISTIERENDEN EINTRAG DES TAGES
+    # -----------------------------------------------------
+
+    if not df.empty:
+
+        bestehend = df[
+            df["Datum"].dt.normalize()
+            == datum
+        ]
+
+    else:
+
+        bestehend = pd.DataFrame()
+
+
+    # -----------------------------------------------------
+    # WENN AUTOMATISCH AKTUALISIERT WIRD
+    # UND KEINE EINZAHLUNG ANGEGEBEN IST:
+    # ALTE EINZAHLUNG BEIBEHALTEN
+    # -----------------------------------------------------
+
+    if (
+        einzahlung == 0
+        and not bestehend.empty
+    ):
+
+        alte_einzahlung = float(
+            bestehend.iloc[-1]["Einzahlung"]
+        )
+
+        altes_konto = str(
+            bestehend.iloc[-1]["Einzahlung Konto"]
+        )
+
+    else:
+
+        alte_einzahlung = einzahlung
+
+        altes_konto = konto
+
+
+    # -----------------------------------------------------
+    # ALTEN TAGES-EINTRAG ENTFERNEN
+    # -----------------------------------------------------
+
+    if not df.empty:
+
+        df = df[
+            df["Datum"].dt.normalize()
+            != datum
+        ]
+
+
+    # -----------------------------------------------------
+    # NEUEN EINTRAG
+    # -----------------------------------------------------
+
     neuer_eintrag = pd.DataFrame({
 
         "Datum": [
@@ -483,16 +772,16 @@ def speichere_depotwert(
 
         "Depotwert": [
             float(depotwert)
+        ],
+
+        "Einzahlung": [
+            alte_einzahlung
+        ],
+
+        "Einzahlung Konto": [
+            altes_konto
         ]
     })
-
-
-    if not df.empty:
-
-        df = df[
-            df["Datum"].dt.normalize()
-            != datum
-        ]
 
 
     df = pd.concat(
@@ -511,96 +800,6 @@ def speichere_depotwert(
 
     df.to_csv(
         HISTORIE_FILE,
-        index=False
-    )
-
-
-# =========================================================
-# EINZAHLUNGEN LADEN
-# =========================================================
-
-def lade_einzahlungen():
-
-    if EINZAHLUNGEN_FILE.exists():
-
-        try:
-
-            df = pd.read_csv(
-                EINZAHLUNGEN_FILE
-            )
-
-            if not df.empty:
-
-                df["Datum"] = pd.to_datetime(
-                    df["Datum"]
-                )
-
-                df["Betrag"] = pd.to_numeric(
-                    df["Betrag"],
-                    errors="coerce"
-                )
-
-                return df
-
-        except Exception:
-
-            pass
-
-
-    return pd.DataFrame(
-        columns=[
-            "Datum",
-            "Depot",
-            "Betrag"
-        ]
-    )
-
-
-# =========================================================
-# EINZAHLUNG SPEICHERN
-# =========================================================
-
-def speichere_einzahlung(
-    datum,
-    depot,
-    betrag
-):
-
-    df = lade_einzahlungen()
-
-
-    neuer_eintrag = pd.DataFrame({
-
-        "Datum": [
-            pd.to_datetime(datum)
-        ],
-
-        "Depot": [
-            depot
-        ],
-
-        "Betrag": [
-            float(betrag)
-        ]
-    })
-
-
-    df = pd.concat(
-        [
-            df,
-            neuer_eintrag
-        ],
-        ignore_index=True
-    )
-
-
-    df = df.sort_values(
-        "Datum"
-    )
-
-
-    df.to_csv(
-        EINZAHLUNGEN_FILE,
         index=False
     )
 
@@ -1100,8 +1299,9 @@ st.metric(
 # AKTUELLEN DEPOTWERT SPEICHERN
 # =========================================================
 
-speichere_depotwert(
-    gesamtdepot
+speichere_historie(
+    gesamtdepot,
+    0.0
 )
 
 
@@ -1109,15 +1309,8 @@ speichere_depotwert(
 # EINZAHLUNGEN
 # =========================================================
 
-st.divider()
-
 st.subheader(
     "💵 Einzahlung erfassen"
-)
-
-st.caption(
-    "Die Einzahlung wird separat gespeichert und "
-    "nicht als Anlagegewinn gewertet."
 )
 
 
@@ -1135,21 +1328,6 @@ with col1:
 
 with col2:
 
-    einzahlung_depot = st.selectbox(
-        "Einzahlung auf",
-        [
-            "Swissquote",
-            "Hypi",
-            "UBS",
-            "BCV",
-            "Findependent"
-        ],
-        key="einzahlung_depot"
-    )
-
-
-with col3:
-
     einzahlung = st.number_input(
         "Einzahlung CHF",
         min_value=0.0,
@@ -1160,21 +1338,38 @@ with col3:
     )
 
 
+with col3:
+
+    einzahlung_konto = st.selectbox(
+        "Einzahlung auf Konto",
+        [
+            "Swissquote",
+            "Hypi",
+            "UBS",
+            "BCV",
+            "Findependent"
+        ],
+        key="einzahlung_konto"
+    )
+
+
 if st.button(
     "➕ Einzahlung speichern"
 ):
 
     if einzahlung > 0:
 
-        speichere_einzahlung(
+        speichere_historie(
+            gesamtdepot,
+            einzahlung,
             einzahlung_datum,
-            einzahlung_depot,
-            einzahlung
+            einzahlung_konto
         )
 
         st.success(
-            f"{format_chf(einzahlung)} auf "
-            f"{einzahlung_depot} gespeichert."
+            f"Einzahlung von "
+            f"{format_chf(einzahlung)} "
+            f"auf {einzahlung_konto} gespeichert."
         )
 
         st.rerun()
@@ -1182,100 +1377,8 @@ if st.button(
     else:
 
         st.warning(
-            "Bitte zuerst einen Betrag eingeben."
+            "Bitte zuerst einen Einzahlungsbetrag eingeben."
         )
-
-
-# =========================================================
-# EINZAHLUNGSÜBERSICHT
-# =========================================================
-
-einzahlungen_df = lade_einzahlungen()
-
-
-if not einzahlungen_df.empty:
-
-    st.markdown(
-        "#### 📋 Einzahlungshistorie"
-    )
-
-    einzahlungen_anzeige = (
-        einzahlungen_df
-        .sort_values("Datum", ascending=False)
-        .copy()
-    )
-
-    einzahlungen_anzeige["Betrag"] = (
-        einzahlungen_anzeige["Betrag"]
-        .apply(format_chf)
-    )
-
-    einzahlungen_anzeige["Datum"] = (
-        einzahlungen_anzeige["Datum"]
-        .dt.strftime("%d.%m.%Y")
-    )
-
-    st.dataframe(
-        einzahlungen_anzeige[
-            [
-                "Datum",
-                "Depot",
-                "Betrag"
-            ]
-        ],
-        use_container_width=True,
-        hide_index=True
-    )
-
-    # -----------------------------------------------------
-    # EINZAHLUNGEN GESAMT
-    # -----------------------------------------------------
-
-    st.markdown(
-        "#### 💰 Einzahlungen nach Depot"
-    )
-
-    einzahlung_summe = (
-        einzahlungen_df
-        .groupby("Depot")["Betrag"]
-        .sum()
-    )
-
-    c1, c2, c3, c4, c5 = st.columns(5)
-
-    for col, depot_name in zip(
-        [c1, c2, c3, c4, c5],
-        [
-            "Swissquote",
-            "Hypi",
-            "UBS",
-            "BCV",
-            "Findependent"
-        ]
-    ):
-
-        with col:
-
-            wert = float(
-                einzahlung_summe.get(
-                    depot_name,
-                    0.0
-                )
-            )
-
-            st.metric(
-                depot_name,
-                format_chf(wert)
-            )
-
-    st.metric(
-        "Gesamte Einzahlungen",
-        format_chf(
-            float(
-                einzahlungen_df["Betrag"].sum()
-            )
-        )
-    )
 
 
 # =========================================================
@@ -1362,35 +1465,21 @@ if len(hist) >= 2:
         )
 
 
-        # -------------------------------------------------
-        # EINZAHLUNGEN IM ZEITRAUM
-        # -------------------------------------------------
-
-        if not einzahlungen_df.empty:
-
-            einzahlungen_zeitraum = (
-                einzahlungen_df[
-                    einzahlungen_df["Datum"]
-                    >= startdatum
-                ]["Betrag"]
-                .sum()
-            )
-
-        else:
-
-            einzahlungen_zeitraum = 0.0
+        einzahlungen = float(
+            periode["Einzahlung"].sum()
+        )
 
 
         echter_gewinn = (
             endwert
             - startwert
-            - float(einzahlungen_zeitraum)
+            - einzahlungen
         )
 
 
         basis = (
             startwert
-            + float(einzahlungen_zeitraum)
+            + einzahlungen
         )
 
 
@@ -1420,9 +1509,7 @@ if len(hist) >= 2:
 
             st.metric(
                 "Einzahlungen",
-                format_chf(
-                    float(einzahlungen_zeitraum)
-                )
+                format_chf(einzahlungen)
             )
 
 
@@ -1461,6 +1548,52 @@ if len(hist) >= 2:
         )
 
 
+        # =================================================
+        # EINZAHLUNGEN NACH KONTO
+        # =================================================
+
+        konto_einzahlungen = (
+            periode[
+                periode["Einzahlung"] > 0
+            ]
+            .groupby("Einzahlung Konto")[
+                "Einzahlung"
+            ]
+            .sum()
+        )
+
+
+        if not konto_einzahlungen.empty:
+
+            st.markdown(
+                "#### 💳 Einzahlungen nach Konto"
+            )
+
+            konto_df = (
+                konto_einzahlungen
+                .reset_index()
+            )
+
+            konto_df.columns = [
+                "Konto",
+                "Einzahlungen CHF"
+            ]
+
+            konto_df[
+                "Einzahlungen CHF"
+            ] = konto_df[
+                "Einzahlungen CHF"
+            ].apply(
+                format_chf
+            )
+
+            st.dataframe(
+                konto_df,
+                use_container_width=True,
+                hide_index=True
+            )
+
+
     else:
 
         st.info(
@@ -1492,26 +1625,46 @@ st.subheader(
 anzeige = df.copy()
 
 
-anzeige["Kurs"] = anzeige.apply(
+def formatiere_kurs(row):
 
-    lambda row:
-        f"{row['Kurs']:,.2f} "
+    kurs = row["Kurs"]
+
+    if pd.isna(kurs):
+
+        return "Nicht verfügbar"
+
+    return (
+        f"{kurs:,.2f} "
         f"{row['Währung']}"
-        .replace(",", "'"),
+        .replace(",", "'")
+    )
 
+
+anzeige["Kurs"] = anzeige.apply(
+    formatiere_kurs,
     axis=1
 )
 
 
 anzeige["Wert CHF"] = (
     anzeige["Wert CHF"]
-    .apply(format_chf)
+    .apply(
+        lambda x:
+        "Nicht verfügbar"
+        if pd.isna(x)
+        else format_chf(x)
+    )
 )
 
 
 anzeige["Gewinn CHF"] = (
     anzeige["Gewinn CHF"]
-    .apply(format_chf)
+    .apply(
+        lambda x:
+        "Nicht verfügbar"
+        if pd.isna(x)
+        else format_chf(x)
+    )
 )
 
 
@@ -1519,7 +1672,9 @@ anzeige["Gewinn %"] = (
     anzeige["Gewinn %"]
     .apply(
         lambda x:
-        f"{x:+.2f} %"
+        "Nicht verfügbar"
+        if pd.isna(x)
+        else f"{x:+.2f} %"
     )
 )
 
@@ -1608,12 +1763,12 @@ with st.expander(
     Fremdwährungen werden zum aktuellen Wechselkurs in CHF
     umgerechnet.
 
-    Einzahlungen werden separat erfasst und nicht als
-    Anlagegewinn betrachtet.
-
     **Gewinn/Verlust:**
 
     `Endwert − Anfangswert − Einzahlungen`
+
+    Dadurch werden zusätzliche Einzahlungen nicht als
+    Anlagegewinn betrachtet.
 
     Beispiel:
 
@@ -1628,17 +1783,8 @@ with st.expander(
     **CHF 195'000 − CHF 180'000 − CHF 10'000
     = CHF 5'000 Gewinn**
 
-    Die Einzahlungen werden zusätzlich einem konkreten
-    Depot zugeordnet:
-
-    - Swissquote
-    - Hypi
-    - UBS
-    - BCV
-    - Findependent
-
-    Dadurch können die Einzahlungen später auch separat
-    nach Depot ausgewertet werden.
+    Die historische Depotentwicklung wird bei den
+    Aktualisierungen der App automatisch gespeichert.
     """)
 
 
