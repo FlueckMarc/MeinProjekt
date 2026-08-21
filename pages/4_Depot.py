@@ -51,7 +51,21 @@ HISTORIE_FILE = BASE_DIR / "depot_historie.csv"
 FIND_FILE = BASE_DIR / "findependent_historie.csv"
 AKTUELL_FILE = BASE_DIR / "depot_aktuell.csv"
 
+# ============================================================
+# SIDEBAR AUSBLENDEN
+# ============================================================
 
+st.markdown("""
+<style>
+    [data-testid="stSidebar"] {
+        display: none;
+    }
+
+    [data-testid="collapsedControl"] {
+        display: none;
+    }
+</style>
+""", unsafe_allow_html=True)
 # =========================================================
 # NAVIGATION
 # =========================================================

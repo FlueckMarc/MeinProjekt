@@ -1,21 +1,71 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-from pathlib import Path
+import plotly.express as px
+import os
+from datetime import datetime
 
-# =========================================================
-# SEITENKONFIGURATION
-# =========================================================
+# ============================================================
+# KONFIGURATION
+# ============================================================
 
 st.set_page_config(
-    page_title="Prognose",
-    page_icon="🔮",
+    page_title="Budget",
+    page_icon="💰",
     layout="wide"
 )
 
-# =========================================================
-# DATEN LADEN
-# =========================================================
+# ============================================================
+# SIDEBAR AUSBLENDEN
+# ============================================================
+
+st.markdown("""
+<style>
+    [data-testid="stSidebar"] {
+        display: none;
+    }
+
+    [data-testid="collapsedControl"] {
+        display: none;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# NAVIGATION
+# ============================================================
+
+nav1, nav2, nav3, nav5 = st.columns(5)
+
+with nav1:
+    st.page_link(
+        "app.py",
+        label="🏠 Übersicht"
+    )
+
+with nav2:
+    st.page_link(
+        "pages/1_Budget.py",
+        label="💰 Budget"
+    )
+
+with nav3:
+    st.page_link(
+        "pages/2_Hypothek.py",
+        label="🏡 Hypothek"
+    )
+
+with nav5:
+    st.page_link(
+        "pages/4_Depot.py",
+        label="📈 Depot"
+    )
+
+st.divider()
+
+# ============================================================
+# DATEIEN
+# ============================================================
+
 
 DATA_FILE = Path(__file__).parent.parent / "vermoegensdaten.csv"
 

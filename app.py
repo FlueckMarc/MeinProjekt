@@ -5,6 +5,24 @@ import plotly.graph_objects as go
 import os
 from datetime import datetime
 
+
+
+# ============================================================
+# SIDEBAR AUSBLENDEN
+# ============================================================
+
+st.markdown("""
+<style>
+    [data-testid="stSidebar"] {
+        display: none;
+    }
+
+    [data-testid="collapsedControl"] {
+        display: none;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # ============================================================
 # PAGE CONFIGURATION
 # ============================================================
