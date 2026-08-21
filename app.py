@@ -13,19 +13,25 @@ st.set_page_config(
 
 
 # ============================================================
-# LOGIN
+# CONFIGURATION
 # ============================================================
 
 SECRET_PASSWORD = "viper01"
 
 
-def check_password():
+# ============================================================
+# SESSION STATE
+# ============================================================
 
-    if "password_correct" not in st.session_state:
-        st.session_state["password_correct"] = False
+if "password_correct" not in st.session_state:
+    st.session_state["password_correct"] = False
 
-    if st.session_state["password_correct"]:
-        return True
+
+# ============================================================
+# LOGIN-SEITE
+# ============================================================
+
+def login_page():
 
     st.markdown(
         "<br><br>",
@@ -69,14 +75,32 @@ def check_password():
                     "❌ Falsches Passwort."
                 )
 
-    return False
+
+# ============================================================
+# NICHT EINGELOGGT
+# ============================================================
+
+if not st.session_state["password_correct"]:
+
+    login = st.Page(
+        login_page,
+        title="Login",
+        default=True
+    )
+
+    pg = st.navigation(
+        [login],
+        position="hidden"
+    )
+
+    pg.run()
 
 
 # ============================================================
-# APP
+# EINGELOGGT
 # ============================================================
 
-if check_password():
+else:
 
     # ========================================================
     # SEITEN DEFINIEREN
@@ -147,6 +171,11 @@ if check_password():
             st.session_state[
                 "password_correct"
             ] = False
+
+            if "login_password" in st.session_state:
+                del st.session_state[
+                    "login_password"
+                ]
 
             st.rerun()
 
