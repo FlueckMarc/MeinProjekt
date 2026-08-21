@@ -62,10 +62,6 @@ st.divider()
 
 positionen = [
 
-    # -----------------------------------------------------
-    # SWISSQUOTE
-    # -----------------------------------------------------
-
     {
         "Depot": "Swissquote",
         "Name": "ABB",
@@ -237,11 +233,6 @@ positionen = [
         "Währung": "USD"
     },
 
-
-    # -----------------------------------------------------
-    # HYPOTHEKARBANK
-    # -----------------------------------------------------
-
     {
         "Depot": "Hypi",
         "Name": "Swiss Re",
@@ -383,10 +374,10 @@ bcv_fonds = {
         "bcv-pension-25-a-ch0118631214"
     ),
 
-    "OFFICIAL_URL": (
-        "https://www.gerifonds.ch/de/iframe/"
-        "CH0118631214"
-    )
+    "OFFICIAL_URLS": [
+        "https://www.gerifonds.ch/en/iframe/CH0118631214",
+        "https://www.gerifonds.ch/de/iframe/CH0118631214"
+    ]
 }
 
 
@@ -431,34 +422,74 @@ def format_percent(wert):
 
 
 # =========================================================
-# YFINANCE
+# ROBUSTES YFINANCE
 # =========================================================
 
 def lade_kurs_yfinance(ticker):
 
     try:
 
-        data = yf.Ticker(
-            ticker
-        ).history(
+        data = yf.download(
+            ticker,
             period="10d",
             interval="1d",
-            auto_adjust=False
+            auto_adjust=False,
+            progress=False,
+            threads=False
         )
 
-        if data.empty:
+        if data is None or data.empty:
             return pd.Series(dtype=float)
 
-        close = (
-            data["Close"]
-            .dropna()
-        )
+        if "Close" not in data.columns:
+            return pd.Series(dtype=float)
+
+        close = data["Close"]
+
+        if isinstance(close, pd.DataFrame):
+
+            if close.empty:
+                return pd.Series(dtype=float)
+
+            close = close.iloc[:, 0]
+
+        close = pd.to_numeric(
+            close,
+            errors="coerce"
+        ).dropna()
 
         return close
 
     except Exception:
 
-        return pd.Series(dtype=float)
+        try:
+
+            data = yf.Ticker(
+                ticker
+            ).history(
+                period="10d",
+                interval="1d",
+                auto_adjust=False
+            )
+
+            if data is None or data.empty:
+                return pd.Series(dtype=float)
+
+            close = data["Close"]
+
+            if isinstance(close, pd.DataFrame):
+                close = close.iloc[:, 0]
+
+            close = pd.to_numeric(
+                close,
+                errors="coerce"
+            ).dropna()
+
+            return close
+
+        except Exception:
+
+            return pd.Series(dtype=float)
 
 
 # =========================================================
@@ -468,9 +499,7 @@ def lade_kurs_yfinance(ticker):
 def lade_robotics_kurs():
 
     urls = [
-
         "https://www.finanzen.ch/derivate/ch0467720428",
-
         "https://www.finanzen.ch/derivate/ch0467720428/kurs"
     ]
 
@@ -621,6 +650,16 @@ def lade_kurshistorie(ticker):
         return pd.Series(dtype=float)
 
 
+    if ticker == "SAP":
+
+        data = lade_kurs_yfinance(
+            "SAP.DE"
+        )
+
+        if not data.empty:
+            return data
+
+
     return lade_kurs_yfinance(
         ticker
     )
@@ -635,29 +674,17 @@ def lade_wechselkurs(von):
     if von == "CHF":
         return 1.0
 
+    data = lade_kurs_yfinance(
+        f"{von}CHF=X"
+    )
+
+    if data.empty:
+        return None
+
     try:
 
-        data = yf.Ticker(
-            f"{von}CHF=X"
-        ).history(
-            period="10d",
-            interval="1d",
-            auto_adjust=False
-        )
-
-        if data.empty:
-            return None
-
-        close = (
-            data["Close"]
-            .dropna()
-        )
-
-        if close.empty:
-            return None
-
         return float(
-            close.iloc[-1]
+            data.iloc[-1]
         )
 
     except Exception:
@@ -824,29 +851,21 @@ def aktualisiere_depot():
 
         ergebnisse.append({
 
-            "Depot":
-                pos["Depot"],
+            "Depot": pos["Depot"],
 
-            "Name":
-                pos["Name"],
+            "Name": pos["Name"],
 
-            "Ticker":
-                pos["Ticker"],
+            "Ticker": pos["Ticker"],
 
-            "Anteile":
-                pos["Anteile"],
+            "Anteile": pos["Anteile"],
 
-            "Einstand":
-                pos["Einstand"],
+            "Einstand": pos["Einstand"],
 
-            "Kurs":
-                kurs,
+            "Kurs": kurs,
 
-            "Währung":
-                pos["Währung"],
+            "Währung": pos["Währung"],
 
-            "Wert CHF":
-                wert_chf,
+            "Wert CHF": wert_chf,
 
             "Tagesvariation CHF":
                 tagesvariation_chf,
@@ -983,7 +1002,7 @@ def zahl_bereinigen(wert):
 
 
 # =========================================================
-# NAV FINANZEN.CH
+# FINANZEN.CH NAV
 # =========================================================
 
 def lade_fonds_nav(url):
@@ -1009,21 +1028,21 @@ def lade_fonds_nav(url):
 
         r"Nettoinventarwert\s*\(NAV\)"
         r".{0,1200}?"
-        r"([0-9]{1,3}(?:[.'’][0-9]{3})*(?:[.,][0-9]+)?)"
+        r"([0-9]{1,4}(?:[.'’][0-9]{3})*(?:[.,][0-9]+)?)"
         r"\s*(?:CHF|USD|EUR)",
 
         r"Nettoinventarwert"
         r".{0,1200}?"
-        r"([0-9]{1,3}(?:[.'’][0-9]{3})*(?:[.,][0-9]+)?)"
+        r"([0-9]{1,4}(?:[.'’][0-9]{3})*(?:[.,][0-9]+)?)"
         r"\s*(?:CHF|USD|EUR)",
 
         r"Aktueller Rücknahmepreis"
         r".{0,1200}?"
-        r"([0-9]{1,3}(?:[.'’][0-9]{3})*(?:[.,][0-9]+)?)",
+        r"([0-9]{1,4}(?:[.'’][0-9]{3})*(?:[.,][0-9]+)?)",
 
         r"Rücknahmepreis"
         r".{0,1200}?"
-        r"([0-9]{1,3}(?:[.'’][0-9]{3})*(?:[.,][0-9]+)?)"
+        r"([0-9]{1,4}(?:[.'’][0-9]{3})*(?:[.,][0-9]+)?)"
     ]
 
 
@@ -1054,55 +1073,67 @@ def lade_fonds_nav(url):
 
 
 # =========================================================
-# BCV NAV OFFIZIELLE GERIFONDS-SEITE
+# BCV NAV OFFIZIELL
 # =========================================================
 
 def lade_bcv_nav_offiziell():
 
-    text = hole_webseite(
-        bcv_fonds["OFFICIAL_URL"]
-    )
+    for url in bcv_fonds[
+        "OFFICIAL_URLS"
+    ]:
 
-    if not text:
-        return None
-
-
-    text = (
-        text
-        .replace("&nbsp;", " ")
-        .replace("&#39;", "'")
-        .replace("&#x27;", "'")
-        .replace("&#x2019;", "'")
-    )
-
-
-    patterns = [
-
-        r"NIW.{0,500}?CHF\s*"
-        r"([0-9]{1,4}(?:[.,][0-9]+)?)",
-
-        r"NAV.{0,500}?CHF\s*"
-        r"([0-9]{1,4}(?:[.,][0-9]+)?)",
-
-        r"CHF\s*"
-        r"([0-9]{2,4}[.,][0-9]{2,6})"
-    ]
-
-
-    for pattern in patterns:
-
-        match = re.search(
-            pattern,
-            text,
-            re.IGNORECASE |
-            re.DOTALL
+        text = hole_webseite(
+            url
         )
 
-        if match:
+        if not text:
+            continue
+
+
+        text = (
+            text
+            .replace("&nbsp;", " ")
+            .replace("&#39;", "'")
+            .replace("&#x27;", "'")
+            .replace("&#x2019;", "'")
+            .replace("\n", " ")
+            .replace("\r", " ")
+        )
+
+
+        patterns = [
+
+            r"\bNAV\b.{0,800}?"
+            r"CHF\s*"
+            r"([0-9]{2,4}(?:[.,][0-9]+)?)",
+
+            r"Nettoinventarwert.{0,800}?"
+            r"CHF\s*"
+            r"([0-9]{2,4}(?:[.,][0-9]+)?)",
+
+            r"\bNIW\b.{0,800}?"
+            r"CHF\s*"
+            r"([0-9]{2,4}(?:[.,][0-9]+)?)"
+        ]
+
+
+        for pattern in patterns:
+
+            match = re.search(
+                pattern,
+                text,
+                re.IGNORECASE |
+                re.DOTALL
+            )
+
+            if not match:
+                continue
+
 
             wert = zahl_bereinigen(
                 match.group(1)
             )
+
 
             if (
                 wert is not None
@@ -1126,6 +1157,7 @@ def aktualisiere_ubs_fonds():
 
     gesamtwert = 0.0
 
+
     for fonds in ubs_fonds_positionen:
 
         nav = lade_fonds_nav(
@@ -1139,17 +1171,13 @@ def aktualisiere_ubs_fonds():
 
         else:
 
-            if fonds["Währung"] == "USD":
+            fx = (
+                lade_wechselkurs("USD")
+                if fonds["Währung"] == "USD"
+                else 1.0
+            )
 
-                fx = lade_wechselkurs(
-                    "USD"
-                )
-
-                if fx is None:
-                    fx = 1.0
-
-            else:
-
+            if fx is None:
                 fx = 1.0
 
 
@@ -1201,16 +1229,16 @@ def aktualisiere_ubs_fonds():
 @st.cache_data(ttl=1800)
 def aktualisiere_bcv():
 
-    # Versuch 1: finanzen.ch
-    nav = lade_fonds_nav(
-        bcv_fonds["URL"]
-    )
+    # Primär offizielle Quelle
+    nav = lade_bcv_nav_offiziell()
 
 
-    # Versuch 2: offizielle Gérifonds-Seite
+    # Fallback finanzen.ch
     if nav is None:
 
-        nav = lade_bcv_nav_offiziell()
+        nav = lade_fonds_nav(
+            bcv_fonds["URL"]
+        )
 
 
     if nav is None:
@@ -1228,8 +1256,8 @@ def aktualisiere_bcv():
 
 
     return (
-        nav,
-        wert
+        float(nav),
+        float(wert)
     )
 
 
@@ -1254,27 +1282,21 @@ def lade_historie():
                 )
 
                 if "Einzahlung Konto" not in df.columns:
-
                     df["Einzahlung Konto"] = ""
 
-
                 if "Einzahlung" not in df.columns:
-
                     df["Einzahlung"] = 0.0
-
 
                 df["Einzahlung"] = pd.to_numeric(
                     df["Einzahlung"],
                     errors="coerce"
                 ).fillna(0.0)
 
-
                 df["Einzahlung Konto"] = (
                     df["Einzahlung Konto"]
                     .fillna("")
                     .astype(str)
                 )
-
 
                 return df
 
@@ -1291,10 +1313,6 @@ def lade_historie():
         ]
     )
 
-
-# =========================================================
-# HISTORIE SPEICHERN
-# =========================================================
 
 def speichere_historie(
     depotwert,
@@ -1484,9 +1502,7 @@ def speichere_findependent(
 # TITEL
 # =========================================================
 
-st.title(
-    "📈 Depot"
-)
+st.title("📈 Depot")
 
 st.caption(
     "Automatische Kursaktualisierung, "
@@ -1510,7 +1526,7 @@ if st.button(
 
 
 # =========================================================
-# ALLE DATEN LADEN
+# DATEN LADEN
 # =========================================================
 
 df, wechselkurse = (
@@ -1534,8 +1550,9 @@ findependent_wert = (
 
 
 depotwerte = (
-    df.groupby("Depot")["Wert CHF"]
-    .sum()
+    df.groupby("Depot")[
+        "Wert CHF"
+    ].sum()
 )
 
 
@@ -1585,10 +1602,6 @@ bcv_wert_sicher = (
 )
 
 
-# =========================================================
-# GESAMTDEPOT
-# =========================================================
-
 gesamtdepot = (
 
     swissquote
@@ -1610,43 +1623,36 @@ st.subheader(
 )
 
 
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3, c4, c5 = (
+    st.columns(5)
+)
 
 
 with c1:
-
     st.metric(
         "Swissquote",
         format_chf(swissquote)
     )
 
-
 with c2:
-
     st.metric(
         "Hypi",
         format_chf(hypi)
     )
 
-
 with c3:
-
     st.metric(
         "UBS",
         format_chf(ubs_wert_sicher)
     )
 
-
 with c4:
-
     st.metric(
         "BCV",
         format_chf(bcv_wert_sicher)
     )
 
-
 with c5:
-
     st.metric(
         "Findependent",
         format_chf(findependent_wert)
@@ -1659,10 +1665,6 @@ st.metric(
 )
 
 
-# =========================================================
-# HISTORIE SPEICHERN
-# =========================================================
-
 speichere_historie(
     gesamtdepot,
     0.0
@@ -1670,7 +1672,7 @@ speichere_historie(
 
 
 # =========================================================
-# 2. EINZAHLUNG ERFASSEN
+# 2. EINZAHLUNGEN
 # =========================================================
 
 st.divider()
@@ -1758,10 +1760,6 @@ st.subheader(
 )
 
 
-# ---------------------------------------------------------
-# TOTALS
-# ---------------------------------------------------------
-
 total_aktien_wert = (
     df["Wert CHF"]
     .sum()
@@ -1840,106 +1838,53 @@ total_gewinn_prozent = (
 )
 
 
-# ---------------------------------------------------------
-# AKTIENÜBERSICHT AUF EINER LINIE
-# ---------------------------------------------------------
-
-st.markdown(
-    f"""
-    <div style="
-        display:flex;
-        justify-content:space-between;
-        align-items:flex-start;
-        gap:22px;
-        padding:8px 2px 16px 2px;
-        white-space:nowrap;
-    ">
-
-        <div style="flex:1;">
-            <div style="
-                font-size:0.86rem;
-                color:#888;
-            ">
-                Aktienwert
-            </div>
-
-            <div style="
-                font-size:1.15rem;
-                font-weight:600;
-            ">
-                {format_chf(total_aktien_wert)}
-            </div>
-        </div>
-
-
-        <div style="flex:1;">
-            <div style="
-                font-size:0.86rem;
-                color:#888;
-            ">
-                Tagesvariation
-            </div>
-
-            <div style="
-                font-size:1.15rem;
-                font-weight:600;
-            ">
-                {format_variation(
-                    total_tagesvariation,
-                    total_tagesprozent
-                )}
-            </div>
-        </div>
-
-
-        <div style="flex:1;">
-            <div style="
-                font-size:0.86rem;
-                color:#888;
-            ">
-                Wochenentwicklung
-            </div>
-
-            <div style="
-                font-size:1.15rem;
-                font-weight:600;
-            ">
-                {format_variation(
-                    total_wochenvariation,
-                    total_wochenprozent
-                )}
-            </div>
-        </div>
-
-
-        <div style="flex:1;">
-            <div style="
-                font-size:0.86rem;
-                color:#888;
-            ">
-                Gewinn seit Kauf
-            </div>
-
-            <div style="
-                font-size:1.15rem;
-                font-weight:600;
-            ">
-                {format_variation(
-                    total_gewinn,
-                    total_gewinn_prozent
-                )}
-            </div>
-        </div>
-
-    </div>
-    """,
-    unsafe_allow_html=True
+a1, a2, a3, a4 = (
+    st.columns(4)
 )
 
 
-# ---------------------------------------------------------
-# AKTIEN-TABELLE
-# ---------------------------------------------------------
+with a1:
+
+    st.metric(
+        "Aktienwert",
+        format_chf(
+            total_aktien_wert
+        )
+    )
+
+
+with a2:
+
+    st.metric(
+        "Tagesvariation",
+        format_variation(
+            total_tagesvariation,
+            total_tagesprozent
+        )
+    )
+
+
+with a3:
+
+    st.metric(
+        "Wochenentwicklung",
+        format_variation(
+            total_wochenvariation,
+            total_wochenprozent
+        )
+    )
+
+
+with a4:
+
+    st.metric(
+        "Gewinn seit Kauf",
+        format_variation(
+            total_gewinn,
+            total_gewinn_prozent
+        )
+    )
+
 
 anzeige = df.copy()
 
@@ -1958,7 +1903,6 @@ def formatiere_kurs(row):
     )
 
 
-# KURS WIEDER SICHTBAR
 anzeige["Kurs"] = (
     anzeige.apply(
         formatiere_kurs,
@@ -2032,8 +1976,6 @@ anzeige = anzeige[
     ]
 ]
 
-
-# TOTAL ALS ERSTE ZEILE
 
 aktien_total_zeile = pd.DataFrame([{
 
@@ -2182,12 +2124,6 @@ if not ubs_detail.empty:
         hide_index=True
     )
 
-else:
-
-    st.error(
-        "UBS Fonds konnten nicht aktualisiert werden."
-    )
-
 
 # =========================================================
 # 5. BCV FONDS
@@ -2200,111 +2136,57 @@ st.subheader(
 )
 
 
-if bcv_nav is None:
-
-    bcv_nav_anzeige = (
-        "Nicht verfügbar"
-    )
-
-else:
-
-    bcv_nav_anzeige = (
-        f"CHF {bcv_nav:,.4f}"
-        .replace(",", "'")
-    )
-
-
-# ALLES AUF EINER LINIE
-
-st.markdown(
-    f"""
-    <div style="
-        display:flex;
-        justify-content:space-between;
-        align-items:flex-start;
-        gap:24px;
-        padding:8px 2px 14px 2px;
-        white-space:nowrap;
-    ">
-
-        <div style="flex:1;">
-            <div style="
-                font-size:0.86rem;
-                color:#888;
-            ">
-                ISIN
-            </div>
-
-            <div style="
-                font-size:1.15rem;
-                font-weight:600;
-            ">
-                {bcv_fonds["ISIN"]}
-            </div>
-        </div>
-
-
-        <div style="flex:1;">
-            <div style="
-                font-size:0.86rem;
-                color:#888;
-            ">
-                Anteile
-            </div>
-
-            <div style="
-                font-size:1.15rem;
-                font-weight:600;
-            ">
-                {bcv_fonds["Anteile"]}
-            </div>
-        </div>
-
-
-        <div style="flex:1;">
-            <div style="
-                font-size:0.86rem;
-                color:#888;
-            ">
-                Aktueller NAV
-            </div>
-
-            <div style="
-                font-size:1.15rem;
-                font-weight:600;
-            ">
-                {bcv_nav_anzeige}
-            </div>
-        </div>
-
-
-        <div style="flex:1;">
-            <div style="
-                font-size:0.86rem;
-                color:#888;
-            ">
-                Gesamtwert
-            </div>
-
-            <div style="
-                font-size:1.15rem;
-                font-weight:600;
-            ">
-                {format_chf(bcv_wert_sicher)}
-            </div>
-        </div>
-
-    </div>
-    """,
-    unsafe_allow_html=True
+b1, b2, b3, b4 = (
+    st.columns(4)
 )
+
+
+with b1:
+
+    st.metric(
+        "ISIN",
+        bcv_fonds["ISIN"]
+    )
+
+
+with b2:
+
+    st.metric(
+        "Anteile",
+        str(
+            bcv_fonds["Anteile"]
+        )
+    )
+
+
+with b3:
+
+    st.metric(
+        "Aktueller NAV",
+        (
+            f"CHF {bcv_nav:,.4f}"
+            .replace(",", "'")
+            if bcv_nav is not None
+            else "Nicht verfügbar"
+        )
+    )
+
+
+with b4:
+
+    st.metric(
+        "Gesamtwert",
+        format_chf(
+            bcv_wert_sicher
+        )
+    )
 
 
 if bcv_nav is None:
 
     st.warning(
-        "Der aktuelle BCV-NAV konnte momentan "
-        "nicht automatisch abgerufen werden."
+        "Der aktuelle BCV-NAV konnte "
+        "momentan nicht abgerufen werden."
     )
 
 
@@ -2319,7 +2201,9 @@ st.subheader(
 )
 
 
-f1, f2 = st.columns(2)
+f1, f2 = (
+    st.columns(2)
+)
 
 
 with f1:
@@ -2362,8 +2246,8 @@ if st.button(
 
 
 st.caption(
-    "Einzahlungen auf Findependent werden oben "
-    "unter «Einzahlung erfassen» erfasst."
+    "Einzahlungen auf Findependent werden "
+    "oben unter «Einzahlung erfassen» eingetragen."
 )
 
 
@@ -2479,7 +2363,9 @@ if len(hist) >= 2:
         )
 
 
-        p1, p2, p3 = st.columns(3)
+        p1, p2, p3 = (
+            st.columns(3)
+        )
 
 
         with p1:
@@ -2494,7 +2380,9 @@ if len(hist) >= 2:
 
             st.metric(
                 "Einzahlungen",
-                format_chf(einzahlungen)
+                format_chf(
+                    einzahlungen
+                )
             )
 
 
@@ -2533,7 +2421,6 @@ if len(hist) >= 2:
 
 
         konto_einzahlungen = (
-
             periode[
                 periode["Einzahlung"] > 0
             ]
@@ -2647,39 +2534,7 @@ st.dataframe(
 
 
 # =========================================================
-# INFO
-# =========================================================
-
-with st.expander(
-    "ℹ️ Wie wird der Gewinn berechnet?"
-):
-
-    st.markdown(
-        """
-        ### Gewinn seit Beginn
-
-        Der Gewinn der einzelnen Aktien wird seit dem
-        hinterlegten Einstand berechnet:
-
-        **Aktueller Wert − Einstandswert**
-
-        Die **Tagesvariation** zeigt die Veränderung
-        gegenüber dem letzten verfügbaren Börsenkurs.
-
-        Die **Wochenentwicklung** zeigt die Veränderung
-        gegenüber ungefähr fünf Börsentagen zuvor.
-
-        Die absoluten Tages- und Wochenveränderungen
-        werden in CHF berechnet.
-
-        Die Performance des Gesamtdepots berücksichtigt
-        zusätzlich die erfassten Einzahlungen.
-        """
-    )
-
-
-# =========================================================
-# AKTUELLER DEPOTWERT FÜR ÜBERSICHT / PROGNOSE
+# AKTUELLER DEPOTWERT
 # =========================================================
 
 aktuell = pd.DataFrame({
