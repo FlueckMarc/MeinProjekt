@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import os
 from datetime import datetime
 
@@ -8,10 +9,63 @@ from datetime import datetime
 # ============================================================
 
 st.set_page_config(
-    page_title="Hypothek",
-    page_icon="🏠",
+    page_title="Budget",
+    page_icon="💰",
     layout="wide"
 )
+
+# ============================================================
+# SIDEBAR AUSBLENDEN
+# ============================================================
+
+st.markdown("""
+<style>
+    [data-testid="stSidebar"] {
+        display: none;
+    }
+
+    [data-testid="collapsedControl"] {
+        display: none;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# NAVIGATION
+# ============================================================
+
+nav1, nav2, nav4, nav5 = st.columns(4)
+
+with nav1:
+    st.page_link(
+        "app.py",
+        label="🏠 Übersicht"
+    )
+
+with nav2:
+    st.page_link(
+        "pages/1_Budget.py",
+        label="💰 Budget"
+    )
+
+with nav4:
+    st.page_link(
+        "pages/3_Prognose.py",
+        label="🔮 Prognose"
+    )
+
+with nav5:
+    st.page_link(
+        "pages/4_Depot.py",
+        label="📈 Depot"
+    )
+
+st.divider()
+
+# ============================================================
+# DATEIEN
+# ============================================================
+
 
 DATA_FILE = "hypothekdaten.csv"
 

@@ -14,6 +14,59 @@ st.set_page_config(
     layout="wide"
 )
 
+# ============================================================
+# SIDEBAR AUSBLENDEN
+# ============================================================
+
+st.markdown("""
+<style>
+    [data-testid="stSidebar"] {
+        display: none;
+    }
+
+    [data-testid="collapsedControl"] {
+        display: none;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# NAVIGATION
+# ============================================================
+
+nav1, nav3, nav4, nav5 = st.columns(4)
+
+with nav1:
+    st.page_link(
+        "app.py",
+        label="🏠 Übersicht"
+    )
+
+with nav3:
+    st.page_link(
+        "pages/2_Hypothek.py",
+        label="🏡 Hypothek"
+    )
+
+with nav4:
+    st.page_link(
+        "pages/3_Prognose.py",
+        label="🔮 Prognose"
+    )
+
+with nav5:
+    st.page_link(
+        "pages/4_Depot.py",
+        label="📈 Depot"
+    )
+
+st.divider()
+
+# ============================================================
+# DATEIEN
+# ============================================================
+
+
 DATA_FILE = "budgetdaten.csv"
 CATEGORY_FILE = "budget_kategorien.csv"
 
