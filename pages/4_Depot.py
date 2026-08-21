@@ -31,6 +31,70 @@ FONDS_FILE = BASE_DIR / "fonds_historie.csv"
 
 
 # =========================================================
+# NAVIGATION
+# =========================================================
+
+st.markdown(
+    """
+    <style>
+
+    .nav-container {
+        display: flex;
+        gap: 18px;
+        align-items: center;
+        margin-top: -10px;
+        margin-bottom: 18px;
+        font-size: 0.88rem;
+    }
+
+    .nav-container a {
+        text-decoration: none;
+        color: inherit;
+        opacity: 0.65;
+    }
+
+    .nav-container a:hover {
+        opacity: 1;
+    }
+
+    .nav-current {
+        font-weight: 600;
+        opacity: 1 !important;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+nav1, nav2, nav3, nav4 = st.columns(4)
+
+with nav1:
+    st.page_link(
+        "app.py",
+        label="Übersicht"
+    )
+
+with nav2:
+    st.page_link(
+        "pages/prognose.py",
+        label="🔮 Prognose"
+    )
+
+with nav3:
+    st.page_link(
+        "pages/hypothek.py",
+        label="🏠 Hypothek"
+    )
+
+with nav4:
+    st.page_link(
+        "pages/budget.py",
+        label="💰 Budget"
+    )
+
+
+# =========================================================
 # DEPOTPOSITIONEN
 # =========================================================
 
@@ -255,49 +319,150 @@ positionen = [
 
 
 # =========================================================
+# UBS FONDS
+# =========================================================
+
+ubs_fonds = [
+
+    {
+        "Valor": "52700098",
+        "ISIN": "CH0527000985",
+        "Name": "VVA - Corporate Bonds F",
+        "Anteile": 75,
+        "Währung": "CHF"
+    },
+
+    {
+        "Valor": "52700097",
+        "ISIN": "CH0527000977",
+        "Name": "VVA - Global Bonds F",
+        "Anteile": 72,
+        "Währung": "CHF"
+    },
+
+    {
+        "Valor": "21501769",
+        "ISIN": "CH0215017697",
+        "Name": "UBS Equity Fund Mid Caps Switzerland F",
+        "Anteile": 0.914,
+        "Währung": "CHF"
+    },
+
+    {
+        "Valor": "841044",
+        "ISIN": "CH0008410448",
+        "Name": "VVA - Aktien Schweiz F",
+        "Anteile": 65,
+        "Währung": "CHF"
+    },
+
+    {
+        "Valor": "51789838",
+        "ISIN": "LU2099998382",
+        "Name": "Focused SICAV Equity Overlay II CHF",
+        "Anteile": 71,
+        "Währung": "CHF"
+    },
+
+    {
+        "Valor": "28650087",
+        "ISIN": "IE00BYM11H29",
+        "Name": "UBS MSCI ACWI SF UCITS ETF",
+        "Anteile": 61,
+        "Währung": "USD"
+    }
+]
+
+
+# =========================================================
+# BCV FONDS
+# =========================================================
+
+bcv_fonds = {
+
+    "Valor": "11863121",
+    "ISIN": "CH0118631214",
+    "Name": "BCV Pension 25 A",
+    "Anteile": 361,
+    "Währung": "CHF"
+}
+
+
+# =========================================================
 # HILFSFUNKTIONEN
 # =========================================================
 
 def format_chf(wert):
 
-    return f"CHF {wert:,.0f}".replace(",", "'")
+    if pd.isna(wert):
+        return "Nicht verfügbar"
+
+    return (
+        f"CHF {wert:,.0f}"
+        .replace(",", "'")
+    )
 
 
 def format_percent(wert):
 
+    if pd.isna(wert):
+        return "Nicht verfügbar"
+
     return f"{wert:+.2f} %"
 
 
+def format_variation(absolut, prozent, waehrung):
+
+    if pd.isna(absolut) or pd.isna(prozent):
+
+        return "Nicht verfügbar"
+
+    return (
+        f"{absolut:+.2f} {waehrung} "
+        f"({prozent:+.2f} %)"
+    )
+
+
 # =========================================================
-# KURS MIT YFINANCE LADEN
+# YFINANCE
 # =========================================================
 
-def lade_kurs_yfinance(ticker):
+def lade_historie_yfinance(ticker):
 
     try:
 
         data = yf.Ticker(ticker).history(
-            period="5d",
+            period="10d",
             auto_adjust=False
         )
 
-        if not data.empty:
+        if data.empty:
+            return None
 
-            close = data["Close"].dropna()
+        data = data["Close"].dropna()
 
-            if not close.empty:
+        if data.empty:
+            return None
 
-                return float(close.iloc[-1])
+        return data
 
     except Exception:
 
-        pass
+        return None
 
-    return None
+
+def lade_kurs_yfinance(ticker):
+
+    data = lade_historie_yfinance(ticker)
+
+    if data is None:
+        return None
+
+    return float(data.iloc[-1])
 
 
 # =========================================================
-# ROBOTICS & AI ÜBER EXTERNE DATENQUELLE
+# ROBOTICS & AI
 # =========================================================
 
 def lade_robotics_kurs():
@@ -324,14 +489,9 @@ def lade_robotics_kurs():
         )
 
         if response.status_code != 200:
-
             return None
 
         text = response.text
-
-        # Suche nach einem Preis in USD.
-        # Die Seite enthält typischerweise
-        # Bid / Ask / Last.
 
         pattern = r"(\d{2,3}\.\d{2,3})\s*USD"
 
@@ -340,117 +500,82 @@ def lade_robotics_kurs():
             text
         )
 
-        if matches:
+        werte = []
 
-            werte = []
+        for match in matches:
 
-            for match in matches:
+            try:
 
-                try:
+                wert = float(match)
 
-                    wert = float(match)
+                if 50 < wert < 1000:
+                    werte.append(wert)
 
-                    if 50 < wert < 1000:
+            except Exception:
+                pass
 
-                        werte.append(wert)
-
-                except Exception:
-
-                    continue
-
-            if werte:
-
-                return float(
-                    werte[0]
-                )
+        if werte:
+            return werte[0]
 
     except Exception:
-
         pass
 
     return None
 
 
 # =========================================================
-# KURS LADEN
+# AKTIENKURS
 # =========================================================
 
-def lade_kurs(ticker):
-
-    # -----------------------------------------------------
-    # ROBOTICS & AI
-    # -----------------------------------------------------
+def lade_aktien_historie(ticker):
 
     if ticker == "ROBTTQ":
 
-        # Versuch 1
-        kurs = lade_kurs_yfinance(
-            "ROBTTQ"
-        )
+        data = lade_historie_yfinance("ROBTTQ")
 
-        if kurs is not None and kurs > 0:
+        if data is not None:
+            return data
 
-            return kurs
+        data = lade_historie_yfinance("ROBTTQ.SW")
 
-        # Versuch 2
-        kurs = lade_kurs_yfinance(
-            "ROBTTQ.SW"
-        )
+        if data is not None:
+            return data
 
-        if kurs is not None and kurs > 0:
-
-            return kurs
-
-        # Versuch 3
         kurs = lade_robotics_kurs()
 
-        if kurs is not None and kurs > 0:
+        if kurs is not None:
 
-            return kurs
+            return pd.Series(
+                [kurs],
+                index=[
+                    pd.Timestamp.now()
+                ]
+            )
 
         return None
-
-
-    # -----------------------------------------------------
-    # ROCHE
-    # -----------------------------------------------------
 
     if ticker == "ROG.SW":
 
-        alternative_ticker = [
-
+        alternativen = [
             "ROG.SW",
             "ROP.SW",
             "RO.SW"
-
         ]
 
-        for alternative in alternative_ticker:
+        for alternative in alternativen:
 
-            kurs = lade_kurs_yfinance(
+            data = lade_historie_yfinance(
                 alternative
             )
 
-            if kurs is not None and kurs > 0:
-
-                return kurs
+            if data is not None:
+                return data
 
         return None
 
-
-    # -----------------------------------------------------
-    # NORMALE TITEL
-    # -----------------------------------------------------
-
-    kurs = lade_kurs_yfinance(
+    return lade_historie_yfinance(
         ticker
     )
-
-    if kurs is not None and kurs > 0:
-
-        return kurs
-
-    return None
 
 
 # =========================================================
@@ -460,7 +585,6 @@ def lade_kurs(ticker):
 def lade_wechselkurs(von):
 
     if von == "CHF":
-
         return 1.0
 
     ticker = f"{von}CHF=X"
@@ -485,7 +609,6 @@ def aktualisiere_depot():
         "CHF": 1.0
     }
 
-
     # -----------------------------------------------------
     # WECHSELKURSE
     # -----------------------------------------------------
@@ -507,19 +630,80 @@ def aktualisiere_depot():
 
 
     # -----------------------------------------------------
-    # POSITIONEN
+    # AKTIEN
     # -----------------------------------------------------
 
     for pos in positionen:
 
-        kurs = lade_kurs(
-            pos["Ticker"]
+        historische_kurse = (
+            lade_aktien_historie(
+                pos["Ticker"]
+            )
         )
 
-        # Kein künstlicher Kurs von 0
-        if kurs is None:
+        if (
+            historische_kurse is None
+            or historische_kurse.empty
+        ):
 
             kurs = float("nan")
+            tagesvariation = float("nan")
+            tagesvariation_prozent = float("nan")
+            wochenvariation = float("nan")
+            wochenvariation_prozent = float("nan")
+
+        else:
+
+            kurs = float(
+                historische_kurse.iloc[-1]
+            )
+
+            if len(historische_kurse) >= 2:
+
+                vortag = float(
+                    historische_kurse.iloc[-2]
+                )
+
+                tagesvariation = (
+                    kurs - vortag
+                )
+
+                tagesvariation_prozent = (
+                    tagesvariation
+                    / vortag
+                    * 100
+                    if vortag != 0
+                    else 0
+                )
+
+            else:
+
+                tagesvariation = float("nan")
+                tagesvariation_prozent = float("nan")
+
+
+            if len(historische_kurse) >= 6:
+
+                wochen_start = float(
+                    historische_kurse.iloc[-6]
+                )
+
+                wochenvariation = (
+                    kurs - wochen_start
+                )
+
+                wochenvariation_prozent = (
+                    wochenvariation
+                    / wochen_start
+                    * 100
+                    if wochen_start != 0
+                    else 0
+                )
+
+            else:
+
+                wochenvariation = float("nan")
+                wochenvariation_prozent = float("nan")
 
 
         wechselkurs = waehrungen.get(
@@ -571,29 +755,33 @@ def aktualisiere_depot():
 
         ergebnisse.append({
 
-            "Depot":
-                pos["Depot"],
+            "Depot": pos["Depot"],
 
-            "Name":
-                pos["Name"],
+            "Name": pos["Name"],
 
-            "Ticker":
-                pos["Ticker"],
+            "Ticker": pos["Ticker"],
 
-            "Anteile":
-                pos["Anteile"],
+            "Anteile": pos["Anteile"],
 
-            "Einstand":
-                pos["Einstand"],
+            "Einstand": pos["Einstand"],
 
-            "Kurs":
-                kurs,
+            "Kurs": kurs,
 
-            "Währung":
-                pos["Währung"],
+            "Währung": pos["Währung"],
 
-            "FX":
-                wechselkurs,
+            "FX": wechselkurs,
+
+            "Tagesvariation":
+                tagesvariation,
+
+            "Tagesvariation %":
+                tagesvariation_prozent,
+
+            "Wochenvariation":
+                wochenvariation,
+
+            "Wochenvariation %":
+                wochenvariation_prozent,
 
             "Wert Original":
                 wert_original,
@@ -612,6 +800,334 @@ def aktualisiere_depot():
     return (
         pd.DataFrame(ergebnisse),
         waehrungen
+    )
+
+
+# =========================================================
+# FONDS-DATEN VON FINANZEN.CH
+# =========================================================
+
+def lade_fondskurs_finanzen(isin):
+
+    try:
+
+        url = (
+            "https://www.finanzen.ch/"
+            f"fonds/{isin.lower()}"
+        )
+
+        headers = {
+            "User-Agent":
+                "Mozilla/5.0 "
+                "(Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 "
+                "Chrome/151.0 Safari/537.36"
+        }
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=10
+        )
+
+        if response.status_code != 200:
+            return None
+
+        text = response.text
+
+        patterns = [
+
+            r"Nettoinventarwert\s*\(NAV\).*?"
+            r"(\d[\d'.,]*\d)\s*(?:CHF|USD|EUR)",
+
+            r"aktueller Rücknahmepreis.*?"
+            r"(\d[\d'.,]*\d)",
+
+            r'"price"\s*:\s*"?(\
+\d[\d.,]*)'
+
+        ]
+
+        for pattern in patterns:
+
+            match = re.search(
+                pattern,
+                text,
+                re.IGNORECASE |
+                re.DOTALL
+            )
+
+            if match:
+
+                wert = match.group(1)
+
+                wert = (
+                    wert
+                    .replace("'", "")
+                    .replace(",", "")
+                )
+
+                try:
+
+                    return float(wert)
+
+                except Exception:
+                    pass
+
+    except Exception:
+        pass
+
+    return None
+
+
+# =========================================================
+# BESSERE FONDS-URLS
+# =========================================================
+
+def lade_fondskurs(isin):
+
+    # -----------------------------------------------------
+    # FINANZEN.CH DIREKT
+    # -----------------------------------------------------
+
+    bekannte_urls = {
+
+        "CH0527000985":
+            "https://www.finanzen.ch/fonds/"
+            "vva-corporate-bonds-f-ch0527000985",
+
+        "CH0527000977":
+            "https://www.finanzen.ch/fonds/"
+            "vva-global-bonds-f-ch0527000977",
+
+        "CH0215017697":
+            "https://www.finanzen.ch/fonds/"
+            "ubs-ch-equity-fund-mid-caps-switzerland-f-"
+            "ch0215017697",
+
+        "CH0008410448":
+            "https://www.finanzen.ch/fonds/"
+            "vva-aktien-schweiz-f-ch0008410448",
+
+        "LU2099998382":
+            "https://www.finanzen.ch/fonds/"
+            "focused-equity-overlay-ii-chff-lu2099998382",
+
+        "IE00BYM11H29":
+            "https://www.finanzen.ch/etf/"
+            "ubs-msci-acwi-sf-etf-ie00bym11h29",
+
+        "CH0118631214":
+            "https://www.finanzen.ch/fonds/"
+            "bcv-portfolio-pension-fund-"
+            "bcv-pension-25-a-ch0118631214"
+    }
+
+
+    url = bekannte_urls.get(
+        isin
+    )
+
+    if url is None:
+        return None
+
+
+    try:
+
+        headers = {
+            "User-Agent":
+                "Mozilla/5.0 "
+                "(Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 "
+                "Chrome/151.0 Safari/537.36"
+        }
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=10
+        )
+
+        if response.status_code != 200:
+            return None
+
+        text = response.text
+
+
+        # -------------------------------------------------
+        # NAV
+        # -------------------------------------------------
+
+        patterns = [
+
+            r"Nettoinventarwert\s*\(NAV\)"
+            r".{0,1000}?"
+            r"(\d[\d'.,]*)\s*CHF",
+
+            r"aktueller Rücknahmepreis"
+            r".{0,500}?"
+            r"(\d[\d'.,]*)",
+
+            r'"price"\s*:\s*"'
+            r"(\d[\d.,]*)",
+
+            r'"nav"\s*:\s*"'
+            r"(\d[\d.,]*)"
+        ]
+
+
+        for pattern in patterns:
+
+            match = re.search(
+                pattern,
+                text,
+                re.IGNORECASE |
+                re.DOTALL
+            )
+
+            if match:
+
+                wert = match.group(1)
+
+                wert = (
+                    wert
+                    .replace("'", "")
+                    .replace(",", "")
+                )
+
+                try:
+
+                    wert = float(wert)
+
+                    if wert > 0:
+                        return wert
+
+                except Exception:
+                    continue
+
+    except Exception:
+        pass
+
+
+    return None
+
+
+# =========================================================
+# FONDS AKTUALISIEREN
+# =========================================================
+
+@st.cache_data(ttl=1800)
+def aktualisiere_fonds():
+
+    ergebnisse = []
+
+
+    # -----------------------------------------------------
+    # UBS
+    # -----------------------------------------------------
+
+    for fonds in ubs_fonds:
+
+        kurs = lade_fondskurs(
+            fonds["ISIN"]
+        )
+
+
+        if kurs is None:
+
+            wert_original = float("nan")
+            wert_chf = float("nan")
+
+        else:
+
+            wert_original = (
+                fonds["Anteile"]
+                * kurs
+            )
+
+            if fonds["Währung"] == "USD":
+
+                fx = lade_wechselkurs(
+                    "USD"
+                )
+
+                if fx is None:
+                    fx = 1.0
+
+            else:
+
+                fx = 1.0
+
+
+            wert_chf = (
+                wert_original
+                * fx
+            )
+
+
+        ergebnisse.append({
+
+            "Depot": "UBS",
+
+            "Name": fonds["Name"],
+
+            "Valor": fonds["Valor"],
+
+            "ISIN": fonds["ISIN"],
+
+            "Anteile": fonds["Anteile"],
+
+            "Kurs": kurs,
+
+            "Währung": fonds["Währung"],
+
+            "Wert CHF": wert_chf
+        })
+
+
+    # -----------------------------------------------------
+    # BCV
+    # -----------------------------------------------------
+
+    kurs = lade_fondskurs(
+        bcv_fonds["ISIN"]
+    )
+
+
+    if kurs is None:
+
+        wert_chf = float("nan")
+
+    else:
+
+        wert_chf = (
+            bcv_fonds["Anteile"]
+            * kurs
+        )
+
+
+    ergebnisse.append({
+
+        "Depot": "BCV",
+
+        "Name": bcv_fonds["Name"],
+
+        "Valor": bcv_fonds["Valor"],
+
+        "ISIN": bcv_fonds["ISIN"],
+
+        "Anteile": bcv_fonds["Anteile"],
+
+        "Kurs": kurs,
+
+        "Währung": "CHF",
+
+        "Wert CHF": wert_chf
+    })
+
+
+    return pd.DataFrame(
+        ergebnisse
     )
 
 
@@ -635,13 +1151,10 @@ def lade_historie():
                     df["Datum"]
                 )
 
-                # Alte CSV kompatibel machen
                 if "Einzahlung Konto" not in df.columns:
-
                     df["Einzahlung Konto"] = ""
 
                 if "Einzahlung" not in df.columns:
-
                     df["Einzahlung"] = 0.0
 
                 df["Einzahlung"] = pd.to_numeric(
@@ -658,7 +1171,6 @@ def lade_historie():
                 return df
 
         except Exception:
-
             pass
 
 
@@ -686,10 +1198,6 @@ def speichere_historie(
     df = lade_historie()
 
 
-    # -----------------------------------------------------
-    # DATUM
-    # -----------------------------------------------------
-
     if datum is None:
 
         datum = pd.Timestamp.now().normalize()
@@ -706,10 +1214,6 @@ def speichere_historie(
     )
 
 
-    # -----------------------------------------------------
-    # EXISTIERENDEN EINTRAG DES TAGES
-    # -----------------------------------------------------
-
     if not df.empty:
 
         bestehend = df[
@@ -721,12 +1225,6 @@ def speichere_historie(
 
         bestehend = pd.DataFrame()
 
-
-    # -----------------------------------------------------
-    # WENN AUTOMATISCH AKTUALISIERT WIRD
-    # UND KEINE EINZAHLUNG ANGEGEBEN IST:
-    # ALTE EINZAHLUNG BEIBEHALTEN
-    # -----------------------------------------------------
 
     if (
         einzahlung == 0
@@ -744,13 +1242,8 @@ def speichere_historie(
     else:
 
         alte_einzahlung = einzahlung
-
         altes_konto = konto
 
-
-    # -----------------------------------------------------
-    # ALTEN TAGES-EINTRAG ENTFERNEN
-    # -----------------------------------------------------
 
     if not df.empty:
 
@@ -760,15 +1253,9 @@ def speichere_historie(
         ]
 
 
-    # -----------------------------------------------------
-    # NEUEN EINTRAG
-    # -----------------------------------------------------
-
     neuer_eintrag = pd.DataFrame({
 
-        "Datum": [
-            datum
-        ],
+        "Datum": [datum],
 
         "Depotwert": [
             float(depotwert)
@@ -805,7 +1292,7 @@ def speichere_historie(
 
 
 # =========================================================
-# FINDINDEPENDENT LADEN
+# FINDINDEPENDENT
 # =========================================================
 
 def lade_findependent():
@@ -827,7 +1314,6 @@ def lade_findependent():
                 return df
 
         except Exception:
-
             pass
 
 
@@ -839,10 +1325,6 @@ def lade_findependent():
         ]
     )
 
-
-# =========================================================
-# FINDINDEPENDENT SPEICHERN
-# =========================================================
 
 def speichere_findependent(
     datum,
@@ -890,104 +1372,6 @@ def speichere_findependent(
 
 
 # =========================================================
-# FONDS HISTORIE LADEN
-# =========================================================
-
-def lade_fonds():
-
-    if FONDS_FILE.exists():
-
-        try:
-
-            df = pd.read_csv(
-                FONDS_FILE
-            )
-
-            if not df.empty:
-
-                df["Datum"] = pd.to_datetime(
-                    df["Datum"]
-                )
-
-                return df
-
-        except Exception:
-
-            pass
-
-
-    return pd.DataFrame(
-        columns=[
-            "Datum",
-            "UBS",
-            "BCV"
-        ]
-    )
-
-
-# =========================================================
-# FONDS SPEICHERN
-# =========================================================
-
-def speichere_fonds(
-    datum,
-    ubs,
-    bcv
-):
-
-    df = lade_fonds()
-
-
-    datum = pd.to_datetime(
-        datum
-    ).normalize()
-
-
-    neuer_eintrag = pd.DataFrame({
-
-        "Datum": [
-            datum
-        ],
-
-        "UBS": [
-            float(ubs)
-        ],
-
-        "BCV": [
-            float(bcv)
-        ]
-    })
-
-
-    if not df.empty:
-
-        df = df[
-            df["Datum"].dt.normalize()
-            != datum
-        ]
-
-
-    df = pd.concat(
-        [
-            df,
-            neuer_eintrag
-        ],
-        ignore_index=True
-    )
-
-
-    df = df.sort_values(
-        "Datum"
-    )
-
-
-    df.to_csv(
-        FONDS_FILE,
-        index=False
-    )
-
-
-# =========================================================
 # TITEL
 # =========================================================
 
@@ -1003,21 +1387,15 @@ st.caption(
 # AKTUALISIEREN
 # =========================================================
 
-col1, col2 = st.columns(
-    [1, 4]
-)
+if st.button(
+    "🔄 Kurse aktualisieren",
+    use_container_width=True
+):
 
+    aktualisiere_depot.clear()
+    aktualisiere_fonds.clear()
 
-with col1:
-
-    if st.button(
-        "🔄 Kurse aktualisieren",
-        use_container_width=True
-    ):
-
-        aktualisiere_depot.clear()
-
-        st.rerun()
+    st.rerun()
 
 
 # =========================================================
@@ -1026,6 +1404,11 @@ with col1:
 
 df, wechselkurse = (
     aktualisiere_depot()
+)
+
+
+fonds_df = (
+    aktualisiere_fonds()
 )
 
 
@@ -1039,7 +1422,6 @@ find_df = lade_findependent()
 st.subheader(
     "🤖 Findependent"
 )
-
 
 col1, col2, col3 = st.columns(3)
 
@@ -1147,75 +1529,81 @@ hypi = float(
 
 
 # =========================================================
-# UBS / BCV FONDS
+# FONDSWERTE
 # =========================================================
 
-fonds_df = lade_fonds()
+ubs_wert = float(
+    fonds_df[
+        fonds_df["Depot"] == "UBS"
+    ]["Wert CHF"]
+    .sum()
+)
 
 
-if not fonds_df.empty:
+bcv_wert = float(
+    fonds_df[
+        fonds_df["Depot"] == "BCV"
+    ]["Wert CHF"]
+    .sum()
+)
 
-    letzter_ubs = float(
-        fonds_df["UBS"].iloc[-1]
-    )
 
-    letzter_bcv = float(
-        fonds_df["BCV"].iloc[-1]
-    )
+# =========================================================
+# FONDSÜBERSICHT
+# =========================================================
 
-else:
-
-    letzter_ubs = 0.0
-    letzter_bcv = 0.0
-
+st.divider()
 
 st.subheader(
     "🏦 Fonds"
 )
 
 
-col1, col2 = st.columns(2)
+fonds_anzeige = fonds_df.copy()
 
 
-with col1:
-
-    ubs_fonds = st.number_input(
-        "UBS Fonds – Gesamtwert CHF",
-        min_value=0.0,
-        max_value=10_000_000.0,
-        value=float(letzter_ubs),
-        step=1000.0,
-        key="ubs_fonds"
+fonds_anzeige["Kurs"] = (
+    fonds_anzeige["Kurs"]
+    .apply(
+        lambda x:
+        "Nicht verfügbar"
+        if pd.isna(x)
+        else f"{x:,.2f}"
+        .replace(",", "'")
     )
+)
 
 
-with col2:
-
-    bcv_fonds = st.number_input(
-        "BCV Fonds – Gesamtwert CHF",
-        min_value=0.0,
-        max_value=10_000_000.0,
-        value=float(letzter_bcv),
-        step=1000.0,
-        key="bcv_fonds"
+fonds_anzeige["Wert CHF"] = (
+    fonds_anzeige["Wert CHF"]
+    .apply(
+        lambda x:
+        "Nicht verfügbar"
+        if pd.isna(x)
+        else format_chf(x)
     )
+)
 
 
-if st.button(
-    "💾 Fondswerte speichern"
-):
+fonds_anzeige = fonds_anzeige[
+    [
+        "Depot",
+        "Name",
+        "Valor",
+        "ISIN",
+        "Anteile",
+        "Kurs",
+        "Währung",
+        "Wert CHF"
+    ]
+]
 
-    speichere_fonds(
-        date.today(),
-        ubs_fonds,
-        bcv_fonds
-    )
 
-    st.success(
-        "UBS- und BCV-Werte gespeichert."
-    )
-
-    st.rerun()
+st.dataframe(
+    fonds_anzeige,
+    use_container_width=True,
+    hide_index=True
+)
 
 
 # =========================================================
@@ -1226,8 +1614,8 @@ gesamtdepot = (
 
     swissquote
     + hypi
-    + ubs_fonds
-    + bcv_fonds
+    + ubs_wert
+    + bcv_wert
     + findependent_wert
 )
 
@@ -1266,7 +1654,7 @@ with c3:
 
     st.metric(
         "UBS",
-        format_chf(ubs_fonds)
+        format_chf(ubs_wert)
     )
 
 
@@ -1274,7 +1662,7 @@ with c4:
 
     st.metric(
         "BCV",
-        format_chf(bcv_fonds)
+        format_chf(bcv_wert)
     )
 
 
@@ -1312,7 +1700,6 @@ speichere_historie(
 st.subheader(
     "💵 Einzahlung erfassen"
 )
-
 
 col1, col2, col3 = st.columns(3)
 
@@ -1459,16 +1846,13 @@ if len(hist) >= 2:
             periode["Depotwert"].iloc[0]
         )
 
-
         endwert = float(
             periode["Depotwert"].iloc[-1]
         )
 
-
         einzahlungen = float(
             periode["Einzahlung"].sum()
         )
-
 
         echter_gewinn = (
             endwert
@@ -1476,12 +1860,10 @@ if len(hist) >= 2:
             - einzahlungen
         )
 
-
         basis = (
             startwert
             + einzahlungen
         )
-
 
         performance_prozent = (
 
@@ -1524,10 +1906,6 @@ if len(hist) >= 2:
             )
 
 
-        # =================================================
-        # PERFORMANCE GRAFIK
-        # =================================================
-
         chart_df = periode[
             [
                 "Datum",
@@ -1548,10 +1926,6 @@ if len(hist) >= 2:
         )
 
 
-        # =================================================
-        # EINZAHLUNGEN NACH KONTO
-        # =================================================
-
         konto_einzahlungen = (
             periode[
                 periode["Einzahlung"] > 0
@@ -1569,23 +1943,28 @@ if len(hist) >= 2:
                 "#### 💳 Einzahlungen nach Konto"
             )
 
+
             konto_df = (
                 konto_einzahlungen
                 .reset_index()
             )
+
 
             konto_df.columns = [
                 "Konto",
                 "Einzahlungen CHF"
             ]
 
+
             konto_df[
                 "Einzahlungen CHF"
-            ] = konto_df[
-                "Einzahlungen CHF"
-            ].apply(
-                format_chf
+            ] = (
+                konto_df[
+                    "Einzahlungen CHF"
+                ]
+                .apply(format_chf)
             )
+
 
             st.dataframe(
                 konto_df,
@@ -1630,7 +2009,6 @@ def formatiere_kurs(row):
     kurs = row["Kurs"]
 
     if pd.isna(kurs):
-
         return "Nicht verfügbar"
 
     return (
@@ -1646,6 +2024,32 @@ anzeige["Kurs"] = anzeige.apply(
 )
 
 
+anzeige["Heute"] = anzeige.apply(
+
+    lambda row:
+    format_variation(
+        row["Tagesvariation"],
+        row["Tagesvariation %"],
+        row["Währung"]
+    ),
+
+    axis=1
+)
+
+
+anzeige["1 Woche"] = anzeige.apply(
+
+    lambda row:
+    format_variation(
+        row["Wochenvariation"],
+        row["Wochenvariation %"],
+        row["Währung"]
+    ),
+
+    axis=1
+)
+
+
 anzeige["Wert CHF"] = (
     anzeige["Wert CHF"]
     .apply(
@@ -1657,7 +2061,7 @@ anzeige["Wert CHF"] = (
 )
 
 
-anzeige["Gewinn CHF"] = (
+anzeige["Gewinn seit Kauf"] = (
     anzeige["Gewinn CHF"]
     .apply(
         lambda x:
@@ -1685,8 +2089,10 @@ anzeige = anzeige[
         "Name",
         "Anteile",
         "Kurs",
+        "Heute",
+        "1 Woche",
         "Wert CHF",
-        "Gewinn CHF",
+        "Gewinn seit Kauf",
         "Gewinn %"
     ]
 ]
@@ -1747,48 +2153,6 @@ st.dataframe(
 
 
 # =========================================================
-# INFO
-# =========================================================
-
-with st.expander(
-    "ℹ️ Wie wird der Gewinn berechnet?"
-):
-
-    st.markdown("""
-    ### Berechnung
-
-    Der Depotwert wird aus den aktuellen Kursen und den
-    hinterlegten Stückzahlen berechnet.
-
-    Fremdwährungen werden zum aktuellen Wechselkurs in CHF
-    umgerechnet.
-
-    **Gewinn/Verlust:**
-
-    `Endwert − Anfangswert − Einzahlungen`
-
-    Dadurch werden zusätzliche Einzahlungen nicht als
-    Anlagegewinn betrachtet.
-
-    Beispiel:
-
-    Anfangswert: CHF 180'000
-
-    Einzahlung: CHF 10'000
-
-    Endwert: CHF 195'000
-
-    Tatsächliche Wertentwicklung:
-
-    **CHF 195'000 − CHF 180'000 − CHF 10'000
-    = CHF 5'000 Gewinn**
-
-    Die historische Depotentwicklung wird bei den
-    Aktualisierungen der App automatisch gespeichert.
-    """)
-
-
-# =========================================================
 # AKTUELLER DEPOTWERT FÜR VERMÖGEN / PROGNOSE
 # =========================================================
 
@@ -1807,11 +2171,11 @@ aktuell = pd.DataFrame({
     ],
 
     "UBS": [
-        ubs_fonds
+        ubs_wert
     ],
 
     "BCV": [
-        bcv_fonds
+        bcv_wert
     ],
 
     "Findependent": [
@@ -1831,13 +2195,59 @@ aktuell.to_csv(
 
 
 # =========================================================
+# INFO
+# =========================================================
+
+with st.expander(
+    "ℹ️ Berechnung"
+):
+
+    st.markdown("""
+    ### Gewinn seit Kauf
+
+    Der Gewinn einer Aktienposition wird anhand des
+    hinterlegten Einstandspreises berechnet:
+
+    `Aktueller Wert − Einstandswert`
+
+    Die Prozentzahl entspricht der Entwicklung seit Kauf.
+
+    ### Tagesentwicklung
+
+    Die Tagesentwicklung vergleicht den aktuellen Kurs
+    mit dem letzten verfügbaren Börsenkurs.
+
+    ### Wochenentwicklung
+
+    Die Wochenentwicklung vergleicht den aktuellen Kurs
+    mit dem Kurs vor ungefähr fünf Börsentagen.
+
+    Die Tages- und Wochenentwicklung wird in der
+    jeweiligen Originalwährung angezeigt.
+
+    Der Depotwert wird anschliessend mit dem aktuellen
+    Wechselkurs in CHF umgerechnet.
+
+    ### Findependent
+
+    Findependent wird weiterhin manuell erfasst.
+
+    ### Fonds
+
+    Die UBS- und BCV-Fonds werden anhand der hinterlegten
+    Anzahl Anteile und des jeweils verfügbaren NAV
+    automatisch bewertet.
+    """)
+
+
+# =========================================================
 # ABSCHLUSS
 # =========================================================
 
 st.divider()
 
 st.caption(
-    "Die Marktdaten werden beim Aktualisieren der App "
-    "neu abgerufen. Die Kursdaten können je nach Börse "
-    "zeitverzögert sein."
+    "Aktienkurse werden automatisch aktualisiert. "
+    "Fondswerte basieren auf den verfügbaren NAV-Daten "
+    "und können gegenüber Börsenkursen zeitlich verzögert sein."
 )
