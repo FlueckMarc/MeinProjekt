@@ -5,7 +5,6 @@ import plotly.graph_objects as go
 import os
 from datetime import datetime
 
-
 # ============================================================
 # PAGE CONFIGURATION
 # ============================================================
@@ -15,7 +14,6 @@ st.set_page_config(
     page_icon="🦅",
     layout="wide"
 )
-
 
 # ============================================================
 # CONFIGURATION
@@ -145,10 +143,78 @@ def check_password():
 
 
 # ============================================================
-# MAIN APP
+# HAUPTSEITE
 # ============================================================
 
 if check_password():
+
+    # ========================================================
+    # DIREKTE NAVIGATION
+    # ========================================================
+
+    st.markdown(
+        """
+        <style>
+
+        .navigation-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        "### 🧭 Finanzübersicht"
+    )
+
+    st.caption(
+        "Direkter Zugriff auf alle Bereiche"
+    )
+
+    nav1, nav2, nav3, nav4 = st.columns(4)
+
+    with nav1:
+
+        st.page_link(
+            "pages/1_Budget.py",
+            label="💰 Budget",
+            icon="💰",
+            use_container_width=True
+        )
+
+    with nav2:
+
+        st.page_link(
+            "pages/2_Hypothek.py",
+            label="🏠 Hypothek",
+            icon="🏠",
+            use_container_width=True
+        )
+
+    with nav3:
+
+        st.page_link(
+            "pages/3_Prognose.py",
+            label="🔮 Prognose",
+            icon="🔮",
+            use_container_width=True
+        )
+
+    with nav4:
+
+        st.page_link(
+            "pages/4_Depot.py",
+            label="📈 Depot",
+            icon="📈",
+            use_container_width=True
+        )
+
+    st.markdown("---")
+
 
     # ========================================================
     # CHECK DATA FILE
@@ -184,7 +250,6 @@ if check_password():
             drop=True
         )
 
-
         # ====================================================
         # CURRENT / PREVIOUS ENTRY
         # ====================================================
@@ -198,7 +263,6 @@ if check_password():
         else:
 
             previous_entry = None
-
 
         # ====================================================
         # CURRENT VALUES
@@ -240,7 +304,6 @@ if check_password():
             "LPP"
         ]
 
-
         # ====================================================
         # TOTAL WEALTH
         # ====================================================
@@ -253,7 +316,6 @@ if check_password():
             + v_lpp
         )
 
-
         # ====================================================
         # FREE WEALTH
         # ====================================================
@@ -264,7 +326,6 @@ if check_password():
             + v_boerse
         )
 
-
         # ====================================================
         # RETIREMENT / PENSION ASSETS
         # ====================================================
@@ -273,7 +334,6 @@ if check_password():
             v_priv
             + v_lpp
         )
-
 
         # ====================================================
         # PREVIOUS VALUES
@@ -318,7 +378,6 @@ if check_password():
             p_lpp = None
 
             previous_total = None
-
 
         # ====================================================
         # CHANGES VS PREVIOUS ENTRY
@@ -366,7 +425,6 @@ if check_password():
             )
         )
 
-
         # ====================================================
         # HEADER
         # ====================================================
@@ -379,7 +437,6 @@ if check_password():
             f"Letzter Stichtag: "
             f"{latest_entry['Datum'].strftime('%d.%m.%Y')}"
         )
-
 
         # ====================================================
         # DEPOT STATUS
@@ -400,7 +457,6 @@ if check_password():
                 "vermoegensdaten.csv wird verwendet."
             )
 
-
         # ====================================================
         # SIDEBAR
         # ====================================================
@@ -418,7 +474,6 @@ if check_password():
             ] = False
 
             st.rerun()
-
 
         # ====================================================
         # TOTAL WEALTH
@@ -458,7 +513,6 @@ if check_password():
                     "%d.%m.%Y"
                 )
             )
-
 
         # ====================================================
         # YEAR-TO-DATE
@@ -524,7 +578,6 @@ if check_password():
 
             ytd_percent = 0
 
-
         # ====================================================
         # YEAR-TO-DATE DISPLAY
         # ====================================================
@@ -576,7 +629,6 @@ if check_password():
                     total_assets
                 )
             )
-
 
         # ====================================================
         # YTD GRAPH
@@ -659,7 +711,6 @@ if check_password():
             use_container_width=True
         )
 
-
         # ====================================================
         # YTD SUMMARY
         # ====================================================
@@ -689,9 +740,7 @@ if check_password():
                 "seit Jahresbeginn nicht verändert."
             )
 
-
         st.markdown("---")
-
 
         # ====================================================
         # THREE FINANCIAL TARGETS
@@ -704,7 +753,6 @@ if check_password():
         target_col1, target_col2, target_col3 = (
             st.columns(3)
         )
-
 
         # ----------------------------------------------------
         # TOTAL WEALTH TARGET
@@ -739,7 +787,6 @@ if check_password():
                 f"**{target_percentage:.1f} % erreicht**"
             )
 
-
         # ----------------------------------------------------
         # FREE WEALTH TARGET
         # ----------------------------------------------------
@@ -772,7 +819,6 @@ if check_password():
             st.markdown(
                 f"**{free_percentage:.1f} % erreicht**"
             )
-
 
         # ----------------------------------------------------
         # RETIREMENT TARGET
@@ -807,9 +853,7 @@ if check_password():
                 f"**{vorsorge_percentage:.1f} % erreicht**"
             )
 
-
         st.markdown("---")
-
 
         # ====================================================
         # ASSET METRICS
@@ -902,9 +946,7 @@ if check_password():
                 )
             )
 
-
         st.markdown("---")
-
 
         # ====================================================
         # TWO COLUMN LAYOUT
@@ -913,7 +955,6 @@ if check_password():
         col_left, col_right = (
             st.columns(2)
         )
-
 
         # ====================================================
         # ASSET DISTRIBUTION
@@ -970,7 +1011,6 @@ if check_password():
                 fig_pie,
                 use_container_width=True
             )
-
 
         # ====================================================
         # ADD NEW MONTH
@@ -1086,7 +1126,6 @@ if check_password():
 
                     st.rerun()
 
-
             # =================================================
             # DELETE ENTRY
             # =================================================
@@ -1154,7 +1193,6 @@ if check_password():
                     )
 
                     st.rerun()
-
 
         # ====================================================
         # TOTAL WEALTH EVOLUTION
@@ -1236,7 +1274,6 @@ if check_password():
             fig_total,
             use_container_width=True
         )
-
 
         # ====================================================
         # STACKED ASSET EVOLUTION
@@ -1398,7 +1435,6 @@ if check_password():
             fig_trend,
             use_container_width=True
         )
-
 
         # ====================================================
         # HISTORICAL TABLE
