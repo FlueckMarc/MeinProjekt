@@ -31,37 +31,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ============================================================
-# NAVIGATION
-# ============================================================
-
-nav1, nav2, nav3, nav5 = st.columns(4)
-
-with nav1:
-    st.page_link(
-        "app.py",
-        label="🏠 Übersicht"
-    )
-
-with nav2:
-    st.page_link(
-        "pages/1_Budget.py",
-        label="💰 Budget"
-    )
-
-with nav3:
-    st.page_link(
-        "pages/2_Hypothek.py",
-        label="🏡 Hypothek"
-    )
-
-with nav5:
-    st.page_link(
-        "pages/4_Depot.py",
-        label="📈 Depot"
-    )
-
-st.divider()
 
 # ============================================================
 # DATEIEN
