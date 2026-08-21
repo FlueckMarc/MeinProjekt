@@ -77,19 +77,19 @@ with nav1:
 
 with nav2:
     st.page_link(
-        "pages/prognose.py",
+        "pages/3_Prognose.py",
         label="🔮 Prognose"
     )
 
 with nav3:
     st.page_link(
-        "pages/hypothek.py",
+        "pages/2_Hypothek.py",
         label="🏠 Hypothek"
     )
 
 with nav4:
     st.page_link(
-        "pages/budget.py",
+        "pages/1_Budget.py",
         label="💰 Budget"
     )
 
