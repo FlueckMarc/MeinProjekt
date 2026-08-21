@@ -7,7 +7,7 @@ import streamlit as st
 
 st.set_page_config(
     page_title="Personal Finance Dashboard",
-    page_icon="寿",
+    page_icon="💎",
     layout="wide"
 )
 
@@ -37,7 +37,7 @@ def check_password():
     with col2:
 
         st.markdown(
-            "## 寿 Privates Finanz-Dashboard"
+            "## 💎 Privates Finanz-Dashboard"
         )
 
         st.caption(
@@ -85,7 +85,7 @@ if check_password():
     uebersicht = st.Page(
         "pages/0_Uebersicht.py",
         title="Übersicht",
-        icon="寿",
+        icon="💎",
         default=True
     )
 
