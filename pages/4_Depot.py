@@ -523,21 +523,21 @@ def lade_robotics_kurs():
 
     urls = [
         "https://www.finanzen.ch/derivate/ch0467720428",
-        "https://www.finanzen.ch/derivate/ch0467720428/kurs"
+        "https://www.six-structured-products.com/de/zertifikat/"
+        "robttq-leon-c-z-CH0467720428"
     ]
 
     headers = {
-
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 "
             "(KHTML, like Gecko) "
             "Chrome/151.0 Safari/537.36"
         ),
-
         "Accept-Language":
             "de-CH,de;q=0.9,en;q=0.8"
     }
+
 
     for url in urls:
 
@@ -552,6 +552,7 @@ def lade_robotics_kurs():
             if response.status_code != 200:
                 continue
 
+
             text = response.text
 
             text = (
@@ -560,24 +561,40 @@ def lade_robotics_kurs():
                 .replace("&#39;", "'")
                 .replace("&#x27;", "'")
                 .replace("&#x2019;", "'")
+                .replace("’", "'")
+                .replace("\n", " ")
+                .replace("\r", " ")
             )
 
-            patterns = [
 
-                r"Aktueller Kurs.{0,500}?"
-                r"(\d{1,4}(?:[.'’]\d{3})*(?:[.,]\d+)?)\s*USD",
+            # =================================================
+            # 1. LETZTER GEHANDELTER KURS
+            # =================================================
 
-                r"Kurs.{0,500}?"
-                r"(\d{1,4}(?:[.'’]\d{3})*(?:[.,]\d+)?)\s*USD",
+            patterns_last = [
 
-                r'"last"\s*:\s*"?(.*?)"?[,}]',
+                r"Letzter gehandelter Kurs"
+                r".{0,800}?"
+                r"([0-9]{2,4}[.,][0-9]{1,4})"
+                r"\s*USD",
 
-                r'"price"\s*:\s*"?(.*?)"?[,}]',
+                r"Letzter Kurs"
+                r".{0,500}?"
+                r"([0-9]{2,4}[.,][0-9]{1,4})",
 
-                r'"kurs"\s*:\s*"?(.*?)"?[,}]'
+                r"Last Price"
+                r".{0,500}?"
+                r"([0-9]{2,4}[.,][0-9]{1,4})",
+
+                r'"last"\s*:\s*"?'
+                r"([0-9]{2,4}(?:[.,][0-9]+)?)",
+
+                r'"lastPrice"\s*:\s*"?'
+                r"([0-9]{2,4}(?:[.,][0-9]+)?)"
             ]
 
-            for pattern in patterns:
+
+            for pattern in patterns_last:
 
                 match = re.search(
                     pattern,
@@ -586,60 +603,149 @@ def lade_robotics_kurs():
                     re.DOTALL
                 )
 
-                if not match:
-                    continue
+                if match:
 
-                wert = match.group(1)
+                    wert = match.group(1)
 
-                wert = (
-                    wert
-                    .replace("'", "")
-                    .replace("’", "")
-                    .replace("USD", "")
-                    .strip()
+                    wert = (
+                        wert
+                        .replace("'", "")
+                        .replace(",", ".")
+                        .strip()
+                    )
+
+                    try:
+
+                        wert = float(wert)
+
+                        if 50 < wert < 1000:
+
+                            return pd.Series(
+                                [wert],
+                                dtype=float
+                            )
+
+                    except Exception:
+
+                        pass
+
+
+            # =================================================
+            # 2. BID ALS FALLBACK
+            # =================================================
+
+            patterns_bid = [
+
+                r"\bBid\b"
+                r".{0,300}?"
+                r"([0-9]{2,4}[.,][0-9]{1,4})"
+                r"\s*USD",
+
+                r"\bGeld\b"
+                r".{0,300}?"
+                r"([0-9]{2,4}[.,][0-9]{1,4})",
+
+                r'"bid"\s*:\s*"?'
+                r"([0-9]{2,4}(?:[.,][0-9]+)?)"
+            ]
+
+
+            for pattern in patterns_bid:
+
+                match = re.search(
+                    pattern,
+                    text,
+                    re.IGNORECASE |
+                    re.DOTALL
                 )
 
-                if "," in wert and "." in wert:
+                if match:
 
-                    if wert.rfind(",") > wert.rfind("."):
+                    wert = match.group(1)
 
-                        wert = (
-                            wert
-                            .replace(".", "")
-                            .replace(",", ".")
-                        )
-
-                    else:
-
-                        wert = wert.replace(
-                            ",",
-                            ""
-                        )
-
-                elif "," in wert:
-
-                    wert = wert.replace(
-                        ",",
-                        "."
-                    )
-
-                try:
-
-                    wert = float(
+                    wert = (
                         wert
+                        .replace("'", "")
+                        .replace(",", ".")
+                        .strip()
                     )
 
-                    if 1 < wert < 5000:
+                    try:
 
-                        return pd.Series(
-                            [wert]
-                        )
+                        wert = float(wert)
 
-                except Exception:
-                    continue
+                        if 50 < wert < 1000:
+
+                            return pd.Series(
+                                [wert],
+                                dtype=float
+                            )
+
+                    except Exception:
+
+                        pass
+
+
+            # =================================================
+            # 3. ASK ALS LETZTER FALLBACK
+            # =================================================
+
+            patterns_ask = [
+
+                r"\bAsk\b"
+                r".{0,300}?"
+                r"([0-9]{2,4}[.,][0-9]{1,4})"
+                r"\s*USD",
+
+                r"\bBrief\b"
+                r".{0,300}?"
+                r"([0-9]{2,4}[.,][0-9]{1,4})",
+
+                r'"ask"\s*:\s*"?'
+                r"([0-9]{2,4}(?:[.,][0-9]+)?)"
+            ]
+
+
+            for pattern in patterns_ask:
+
+                match = re.search(
+                    pattern,
+                    text,
+                    re.IGNORECASE |
+                    re.DOTALL
+                )
+
+                if match:
+
+                    wert = match.group(1)
+
+                    wert = (
+                        wert
+                        .replace("'", "")
+                        .replace(",", ".")
+                        .strip()
+                    )
+
+                    try:
+
+                        wert = float(wert)
+
+                        if 50 < wert < 1000:
+
+                            return pd.Series(
+                                [wert],
+                                dtype=float
+                            )
+
+                    except Exception:
+
+                        pass
+
 
         except Exception:
+
             continue
+
 
     return pd.Series(dtype=float)
 
