@@ -19,6 +19,29 @@ st.set_page_config(
 
 
 # =========================================================
+# DARSTELLUNG
+# =========================================================
+
+st.markdown(
+    """
+    <style>
+
+    /* Abschnittsüberschriften etwas kleiner */
+    h2 {
+        font-size: 1.45rem !important;
+    }
+
+    h3 {
+        font-size: 1.15rem !important;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# =========================================================
 # DATEIEN
 # =========================================================
 
@@ -1229,11 +1252,9 @@ def aktualisiere_ubs_fonds():
 @st.cache_data(ttl=1800)
 def aktualisiere_bcv():
 
-    # Primär offizielle Quelle
     nav = lade_bcv_nav_offiziell()
 
 
-    # Fallback finanzen.ch
     if nav is None:
 
         nav = lade_fonds_nav(
@@ -1613,6 +1634,18 @@ gesamtdepot = (
 
 
 # =========================================================
+# GESAMTDEPOT GANZ OBEN
+# =========================================================
+
+st.metric(
+    "💰 GESAMTDEPOT",
+    format_chf(
+        gesamtdepot
+    )
+)
+
+
+# =========================================================
 # 1. DEPOTÜBERSICHT
 # =========================================================
 
@@ -1657,12 +1690,6 @@ with c5:
         "Findependent",
         format_chf(findependent_wert)
     )
-
-
-st.metric(
-    "💰 GESAMTDEPOT",
-    format_chf(gesamtdepot)
-)
 
 
 speichere_historie(
