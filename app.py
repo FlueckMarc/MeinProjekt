@@ -6,23 +6,6 @@ import os
 from datetime import datetime
 
 
-
-# ============================================================
-# SIDEBAR AUSBLENDEN
-# ============================================================
-
-st.markdown("""
-<style>
-    [data-testid="stSidebar"] {
-        display: none;
-    }
-
-    [data-testid="collapsedControl"] {
-        display: none;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 # ============================================================
 # PAGE CONFIGURATION
 # ============================================================
@@ -32,6 +15,27 @@ st.set_page_config(
     page_icon="🦅",
     layout="wide"
 )
+
+
+# ============================================================
+# SIDEBAR AUSBLENDEN
+# ============================================================
+
+st.markdown(
+    """
+    <style>
+        [data-testid="stSidebar"] {
+            display: none;
+        }
+
+        [data-testid="collapsedControl"] {
+            display: none;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 
 # ============================================================
 # CONFIGURATION
@@ -54,26 +58,57 @@ ZIEL_VORSORGE = 1_000_000
 
 def format_chf(value):
     """Schweizer Zahlenformat"""
-    return f"{value:,.0f}".replace(",", "'") + " CHF"
+
+    return (
+        f"{value:,.0f}"
+        .replace(",", "'")
+        + " CHF"
+    )
 
 
 def format_change(value):
     """Schweizer Zahlenformat mit Vorzeichen"""
-    return f"{value:+,.0f}".replace(",", "'") + " CHF"
+
+    return (
+        f"{value:+,.0f}"
+        .replace(",", "'")
+        + " CHF"
+    )
 
 
-def calculate_change(current, previous):
+def calculate_change(
+    current,
+    previous
+):
 
-    if previous is None or previous == 0:
+    if (
+        previous is None
+        or previous == 0
+    ):
+
         return 0, 0
 
-    change_chf = current - previous
+
+    change_chf = (
+        current
+        - previous
+    )
+
 
     change_percent = (
-        (current - previous) / previous
-    ) * 100
+        (
+            current
+            - previous
+        )
+        / previous
+        * 100
+    )
 
-    return change_chf, change_percent
+
+    return (
+        change_chf,
+        change_percent
+    )
 
 
 def get_current_depot_value():
@@ -83,8 +118,12 @@ def get_current_depot_value():
     aus depot_aktuell.csv.
     """
 
-    if not os.path.exists(DEPOT_FILE):
+    if not os.path.exists(
+        DEPOT_FILE
+    ):
+
         return None
+
 
     try:
 
@@ -92,12 +131,18 @@ def get_current_depot_value():
             DEPOT_FILE
         )
 
+
         if df_depot.empty:
+
             return None
 
+
         return float(
-            df_depot["Depotwert"].iloc[-1]
+            df_depot[
+                "Depotwert"
+            ].iloc[-1]
         )
+
 
     except Exception:
 
@@ -112,18 +157,28 @@ def check_password():
 
     if "password_correct" not in st.session_state:
 
-        st.session_state["password_correct"] = False
+        st.session_state[
+            "password_correct"
+        ] = False
 
-    if st.session_state["password_correct"]:
+
+    if st.session_state[
+        "password_correct"
+    ]:
 
         return True
+
 
     st.markdown(
         "<br><br>",
         unsafe_allow_html=True
     )
 
-    col1, col2, col3 = st.columns(3)
+
+    col1, col2, col3 = (
+        st.columns(3)
+    )
+
 
     with col2:
 
@@ -131,31 +186,40 @@ def check_password():
             "🔒 Privates Finanz-Dashboard"
         )
 
-        user_password = st.text_input(
-            "Passwort",
-            type="password",
-            key="login_password"
+
+        user_password = (
+            st.text_input(
+                "Passwort",
+                type="password",
+                key="login_password"
+            )
         )
 
-        if st.button("Anmelden"):
 
-            if user_password == SECRET_PASSWORD:
+        if st.button(
+            "Anmelden",
+            use_container_width=True
+        ):
+
+            if (
+                user_password
+                == SECRET_PASSWORD
+            ):
 
                 st.session_state[
                     "password_correct"
                 ] = True
 
-                st.success(
-                    "Login erfolgreich!"
-                )
 
                 st.rerun()
+
 
             else:
 
                 st.error(
                     "❌ Falsches Passwort."
                 )
+
 
     return False
 
@@ -166,72 +230,84 @@ def check_password():
 
 if check_password():
 
+
     # ========================================================
-    # DIREKTE NAVIGATION
+    # NAVIGATION
     # ========================================================
-
-    st.markdown(
-        """
-        <style>
-
-        .navigation-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
 
     st.markdown(
         "### 🧭 Finanzübersicht"
     )
 
-    st.caption(
-        "Direkter Zugriff auf alle Bereiche"
+
+    nav1, nav2, nav3, nav4 = (
+        st.columns(4)
     )
 
-    nav1, nav2, nav3, nav4 = st.columns(4)
 
     with nav1:
 
         st.page_link(
             "pages/1_Budget.py",
-            label="💰 Budget",
-            icon="💰",
-            use_container_width=True
+            label="Budget",
+            icon="💰"
         )
+
 
     with nav2:
 
         st.page_link(
             "pages/2_Hypothek.py",
-            label="🏠 Hypothek",
-            icon="🏠",
-            use_container_width=True
+            label="Hypothek",
+            icon="🏠"
         )
+
 
     with nav3:
 
         st.page_link(
             "pages/3_Prognose.py",
-            label="🔮 Prognose",
-            icon="🔮",
-            use_container_width=True
+            label="Prognose",
+            icon="🔮"
         )
+
 
     with nav4:
 
         st.page_link(
             "pages/4_Depot.py",
-            label="📈 Depot",
-            icon="📈",
-            use_container_width=True
+            label="Depot",
+            icon="📈"
         )
 
-    st.markdown("---")
+
+    # ========================================================
+    # ABMELDEN
+    # ========================================================
+
+    logout_col1, logout_col2 = (
+        st.columns(
+            [5, 1]
+        )
+    )
+
+
+    with logout_col2:
+
+        if st.button(
+            "🔒 Abmelden",
+            use_container_width=True
+        ):
+
+            st.session_state[
+                "password_correct"
+            ] = False
+
+
+            st.rerun()
+
+
+    st.divider()
 
 
     # ========================================================
@@ -239,8 +315,13 @@ if check_password():
     # ========================================================
 
     if (
-        not os.path.exists(DATA_FILE)
-        or os.stat(DATA_FILE).st_size == 0
+        not os.path.exists(
+            DATA_FILE
+        )
+        or
+        os.stat(
+            DATA_FILE
+        ).st_size == 0
     ):
 
         st.error(
@@ -248,7 +329,9 @@ if check_password():
             "nicht gefunden oder leer!"
         )
 
+
     else:
+
 
         # ====================================================
         # LOAD DATA
@@ -258,69 +341,109 @@ if check_password():
             DATA_FILE
         )
 
-        df_history["Datum"] = pd.to_datetime(
-            df_history["Datum"]
+
+        df_history[
+            "Datum"
+        ] = pd.to_datetime(
+            df_history[
+                "Datum"
+            ]
         )
 
-        df_history = df_history.sort_values(
-            by="Datum"
-        ).reset_index(
-            drop=True
+
+        df_history = (
+            df_history
+            .sort_values(
+                by="Datum"
+            )
+            .reset_index(
+                drop=True
+            )
         )
+
 
         # ====================================================
         # CURRENT / PREVIOUS ENTRY
         # ====================================================
 
-        latest_entry = df_history.iloc[-1]
+        latest_entry = (
+            df_history.iloc[-1]
+        )
 
-        if len(df_history) >= 2:
 
-            previous_entry = df_history.iloc[-2]
+        if len(
+            df_history
+        ) >= 2:
+
+            previous_entry = (
+                df_history.iloc[-2]
+            )
 
         else:
 
             previous_entry = None
 
+
         # ====================================================
         # CURRENT VALUES
         # ====================================================
 
-        v_liq = latest_entry[
-            "Liquide_Mittel"
-        ]
+        v_liq = (
+            latest_entry[
+                "Liquide_Mittel"
+            ]
+        )
 
-        v_spar = latest_entry[
-            "Sparvermoegen"
-        ]
+
+        v_spar = (
+            latest_entry[
+                "Sparvermoegen"
+            ]
+        )
+
 
         # ----------------------------------------------------
         # AKTUELLEN DEPOTWERT AUTOMATISCH LADEN
         # ----------------------------------------------------
 
-        current_depot = get_current_depot_value()
+        current_depot = (
+            get_current_depot_value()
+        )
+
 
         if current_depot is not None:
 
-            v_boerse = current_depot
+            v_boerse = (
+                current_depot
+            )
 
             depot_automatisch = True
 
+
         else:
 
-            v_boerse = latest_entry[
-                "Boerse"
-            ]
+            v_boerse = (
+                latest_entry[
+                    "Boerse"
+                ]
+            )
 
             depot_automatisch = False
 
-        v_priv = latest_entry[
-            "Private_Vorsorge"
-        ]
 
-        v_lpp = latest_entry[
-            "LPP"
-        ]
+        v_priv = (
+            latest_entry[
+                "Private_Vorsorge"
+            ]
+        )
+
+
+        v_lpp = (
+            latest_entry[
+                "LPP"
+            ]
+        )
+
 
         # ====================================================
         # TOTAL WEALTH
@@ -334,6 +457,7 @@ if check_password():
             + v_lpp
         )
 
+
         # ====================================================
         # FREE WEALTH
         # ====================================================
@@ -344,6 +468,7 @@ if check_password():
             + v_boerse
         )
 
+
         # ====================================================
         # RETIREMENT / PENSION ASSETS
         # ====================================================
@@ -353,31 +478,47 @@ if check_password():
             + v_lpp
         )
 
+
         # ====================================================
         # PREVIOUS VALUES
         # ====================================================
 
         if previous_entry is not None:
 
-            p_liq = previous_entry[
-                "Liquide_Mittel"
-            ]
+            p_liq = (
+                previous_entry[
+                    "Liquide_Mittel"
+                ]
+            )
 
-            p_spar = previous_entry[
-                "Sparvermoegen"
-            ]
 
-            p_boerse = previous_entry[
-                "Boerse"
-            ]
+            p_spar = (
+                previous_entry[
+                    "Sparvermoegen"
+                ]
+            )
 
-            p_priv = previous_entry[
-                "Private_Vorsorge"
-            ]
 
-            p_lpp = previous_entry[
-                "LPP"
-            ]
+            p_boerse = (
+                previous_entry[
+                    "Boerse"
+                ]
+            )
+
+
+            p_priv = (
+                previous_entry[
+                    "Private_Vorsorge"
+                ]
+            )
+
+
+            p_lpp = (
+                previous_entry[
+                    "LPP"
+                ]
+            )
+
 
             previous_total = (
                 p_liq
@@ -386,6 +527,7 @@ if check_password():
                 + p_priv
                 + p_lpp
             )
+
 
         else:
 
@@ -397,51 +539,64 @@ if check_password():
 
             previous_total = None
 
+
         # ====================================================
         # CHANGES VS PREVIOUS ENTRY
         # ====================================================
 
-        total_change, total_change_percent = (
-            calculate_change(
-                total_assets,
-                previous_total
-            )
+        (
+            total_change,
+            total_change_percent
+        ) = calculate_change(
+            total_assets,
+            previous_total
         )
 
-        liq_change, liq_percent = (
-            calculate_change(
-                v_liq,
-                p_liq
-            )
+
+        (
+            liq_change,
+            liq_percent
+        ) = calculate_change(
+            v_liq,
+            p_liq
         )
 
-        spar_change, spar_percent = (
-            calculate_change(
-                v_spar,
-                p_spar
-            )
+
+        (
+            spar_change,
+            spar_percent
+        ) = calculate_change(
+            v_spar,
+            p_spar
         )
 
-        boerse_change, boerse_percent = (
-            calculate_change(
-                v_boerse,
-                p_boerse
-            )
+
+        (
+            boerse_change,
+            boerse_percent
+        ) = calculate_change(
+            v_boerse,
+            p_boerse
         )
 
-        priv_change, priv_percent = (
-            calculate_change(
-                v_priv,
-                p_priv
-            )
+
+        (
+            priv_change,
+            priv_percent
+        ) = calculate_change(
+            v_priv,
+            p_priv
         )
 
-        lpp_change, lpp_percent = (
-            calculate_change(
-                v_lpp,
-                p_lpp
-            )
+
+        (
+            lpp_change,
+            lpp_percent
+        ) = calculate_change(
+            v_lpp,
+            p_lpp
         )
+
 
         # ====================================================
         # HEADER
@@ -451,10 +606,12 @@ if check_password():
             "🦅 Mein Vermögens-Dashboard"
         )
 
+
         st.caption(
             f"Letzter Stichtag: "
             f"{latest_entry['Datum'].strftime('%d.%m.%Y')}"
         )
+
 
         # ====================================================
         # DEPOT STATUS
@@ -467,6 +624,7 @@ if check_password():
                 f"übernommen: **{format_chf(v_boerse)}**"
             )
 
+
         else:
 
             st.info(
@@ -475,23 +633,6 @@ if check_password():
                 "vermoegensdaten.csv wird verwendet."
             )
 
-        # ====================================================
-        # SIDEBAR
-        # ====================================================
-
-        st.sidebar.title(
-            "⚙️ Einstellungen"
-        )
-
-        if st.sidebar.button(
-            "🔒 Abmelden"
-        ):
-
-            st.session_state[
-                "password_correct"
-            ] = False
-
-            st.rerun()
 
         # ====================================================
         # TOTAL WEALTH
@@ -501,9 +642,13 @@ if check_password():
             "## 🦅 Gesamtvermögen"
         )
 
-        total_col1, total_col2 = st.columns(
-            [2, 1]
+
+        total_col1, total_col2 = (
+            st.columns(
+                [2, 1]
+            )
         )
+
 
         with total_col1:
 
@@ -520,17 +665,22 @@ if check_password():
                 )
             )
 
+
         with total_col2:
 
             st.metric(
                 label="Stichtag",
 
-                value=latest_entry[
-                    "Datum"
-                ].strftime(
-                    "%d.%m.%Y"
+                value=(
+                    latest_entry[
+                        "Datum"
+                    ]
+                    .strftime(
+                        "%d.%m.%Y"
+                    )
                 )
             )
+
 
         # ====================================================
         # YEAR-TO-DATE
@@ -542,13 +692,17 @@ if check_password():
             ].year
         )
 
+
         df_current_year = (
             df_history[
                 df_history[
                     "Datum"
-                ].dt.year == current_year
-            ].copy()
+                ].dt.year
+                == current_year
+            ]
+            .copy()
         )
+
 
         df_current_year[
             "Gesamtvermoegen"
@@ -570,9 +724,11 @@ if check_password():
             ]
         )
 
+
         first_year_entry = (
             df_current_year.iloc[0]
         )
+
 
         year_start_assets = (
             first_year_entry[
@@ -580,21 +736,26 @@ if check_password():
             ]
         )
 
+
         ytd_change = (
             total_assets
             - year_start_assets
         )
+
 
         if year_start_assets != 0:
 
             ytd_percent = (
                 ytd_change
                 / year_start_assets
-            ) * 100
+                * 100
+            )
+
 
         else:
 
             ytd_percent = 0
+
 
         # ====================================================
         # YEAR-TO-DATE DISPLAY
@@ -604,9 +765,13 @@ if check_password():
             f"### 📅 Entwicklung {current_year}"
         )
 
-        ytd_col1, ytd_col2, ytd_col3 = (
-            st.columns(3)
-        )
+
+        (
+            ytd_col1,
+            ytd_col2,
+            ytd_col3
+        ) = st.columns(3)
+
 
         with ytd_col1:
 
@@ -625,6 +790,7 @@ if check_password():
                 )
             )
 
+
         with ytd_col2:
 
             st.metric(
@@ -638,6 +804,7 @@ if check_password():
                 )
             )
 
+
         with ytd_col3:
 
             st.metric(
@@ -648,6 +815,7 @@ if check_password():
                 )
             )
 
+
         # ====================================================
         # YTD GRAPH
         # ====================================================
@@ -657,7 +825,9 @@ if check_password():
             f"seit 1. Januar {current_year}"
         )
 
+
         fig_ytd = go.Figure()
+
 
         fig_ytd.add_trace(
             go.Scatter(
@@ -683,13 +853,15 @@ if check_password():
                     size=8
                 ),
 
-                hovertemplate=
+                hovertemplate=(
                     "%{x|%d.%m.%Y}<br>"
                     + "Gesamtvermögen: "
                     + "%{y:,.0f} CHF"
                     + "<extra></extra>"
+                )
             )
         )
+
 
         fig_ytd.add_hline(
             y=year_start_assets,
@@ -705,6 +877,7 @@ if check_password():
 
             annotation_position="top left"
         )
+
 
         fig_ytd.update_layout(
 
@@ -724,10 +897,12 @@ if check_password():
             showlegend=False
         )
 
+
         st.plotly_chart(
             fig_ytd,
             use_container_width=True
         )
+
 
         # ====================================================
         # YTD SUMMARY
@@ -742,6 +917,7 @@ if check_password():
                 f"bzw. **{ytd_percent:+.2f}%** gestiegen."
             )
 
+
         elif ytd_change < 0:
 
             st.error(
@@ -751,6 +927,7 @@ if check_password():
                 f"bzw. **{ytd_percent:.2f}%** gesunken."
             )
 
+
         else:
 
             st.info(
@@ -758,7 +935,9 @@ if check_password():
                 "seit Jahresbeginn nicht verändert."
             )
 
-        st.markdown("---")
+
+        st.divider()
+
 
         # ====================================================
         # THREE FINANCIAL TARGETS
@@ -768,9 +947,13 @@ if check_password():
             "### 🎯 Meine finanziellen Ziele"
         )
 
-        target_col1, target_col2, target_col3 = (
-            st.columns(3)
-        )
+
+        (
+            target_col1,
+            target_col2,
+            target_col3
+        ) = st.columns(3)
+
 
         # ----------------------------------------------------
         # TOTAL WEALTH TARGET
@@ -782,28 +965,39 @@ if check_password():
                 "#### 🎯 Vermögensziel"
             )
 
+
             target_percentage = (
                 total_assets
                 / ZIELVERMOEGEN
-            ) * 100
+                * 100
+            )
+
 
             target_percentage_display = min(
-                max(target_percentage, 0),
+                max(
+                    target_percentage,
+                    0
+                ),
                 100
             )
 
+
             st.progress(
-                target_percentage_display / 100
+                target_percentage_display
+                / 100
             )
+
 
             st.markdown(
                 f"**{format_chf(total_assets)}** "
                 f"/ **{format_chf(ZIELVERMOEGEN)}**"
             )
 
+
             st.markdown(
                 f"**{target_percentage:.1f} % erreicht**"
             )
+
 
         # ----------------------------------------------------
         # FREE WEALTH TARGET
@@ -815,28 +1009,39 @@ if check_password():
                 "#### 💰 Frei verfügbares Vermögen"
             )
 
+
             free_percentage = (
                 free_assets
                 / ZIEL_FREIES_VERMOEGEN
-            ) * 100
+                * 100
+            )
+
 
             free_percentage_display = min(
-                max(free_percentage, 0),
+                max(
+                    free_percentage,
+                    0
+                ),
                 100
             )
 
+
             st.progress(
-                free_percentage_display / 100
+                free_percentage_display
+                / 100
             )
+
 
             st.markdown(
                 f"**{format_chf(free_assets)}** "
                 f"/ **{format_chf(ZIEL_FREIES_VERMOEGEN)}**"
             )
 
+
             st.markdown(
                 f"**{free_percentage:.1f} % erreicht**"
             )
+
 
         # ----------------------------------------------------
         # RETIREMENT TARGET
@@ -848,30 +1053,42 @@ if check_password():
                 "#### 🛡️ Vorsorge"
             )
 
+
             vorsorge_percentage = (
                 vorsorge
                 / ZIEL_VORSORGE
-            ) * 100
+                * 100
+            )
+
 
             vorsorge_percentage_display = min(
-                max(vorsorge_percentage, 0),
+                max(
+                    vorsorge_percentage,
+                    0
+                ),
                 100
             )
 
+
             st.progress(
-                vorsorge_percentage_display / 100
+                vorsorge_percentage_display
+                / 100
             )
+
 
             st.markdown(
                 f"**{format_chf(vorsorge)}** "
                 f"/ **{format_chf(ZIEL_VORSORGE)}**"
             )
 
+
             st.markdown(
                 f"**{vorsorge_percentage:.1f} % erreicht**"
             )
 
-        st.markdown("---")
+
+        st.divider()
+
 
         # ====================================================
         # ASSET METRICS
@@ -881,9 +1098,13 @@ if check_password():
             "### 💰 Vermögenswerte"
         )
 
-        row1_col1, row1_col2, row1_col3 = (
-            st.columns(3)
-        )
+
+        (
+            row1_col1,
+            row1_col2,
+            row1_col3
+        ) = st.columns(3)
+
 
         with row1_col1:
 
@@ -900,6 +1121,7 @@ if check_password():
                 )
             )
 
+
         with row1_col2:
 
             st.metric(
@@ -914,6 +1136,7 @@ if check_password():
                     f"({spar_percent:+.2f}%)"
                 )
             )
+
 
         with row1_col3:
 
@@ -930,9 +1153,11 @@ if check_password():
                 )
             )
 
+
         row2_col1, row2_col2 = (
             st.columns(2)
         )
+
 
         with row2_col1:
 
@@ -949,6 +1174,7 @@ if check_password():
                 )
             )
 
+
         with row2_col2:
 
             st.metric(
@@ -964,7 +1190,9 @@ if check_password():
                 )
             )
 
-        st.markdown("---")
+
+        st.divider()
+
 
         # ====================================================
         # TWO COLUMN LAYOUT
@@ -973,6 +1201,7 @@ if check_password():
         col_left, col_right = (
             st.columns(2)
         )
+
 
         # ====================================================
         # ASSET DISTRIBUTION
@@ -983,6 +1212,7 @@ if check_password():
             st.markdown(
                 "### 📊 Aktuelle Verteilung"
             )
+
 
             asset_data = pd.DataFrame({
 
@@ -1003,6 +1233,7 @@ if check_password():
                 ]
             })
 
+
             fig_pie = px.pie(
                 asset_data,
                 values="Betrag",
@@ -1010,10 +1241,12 @@ if check_password():
                 hole=0.45
             )
 
+
             fig_pie.update_traces(
                 textposition="inside",
                 textinfo="percent+label"
             )
+
 
             fig_pie.update_layout(
                 margin=dict(
@@ -1022,13 +1255,16 @@ if check_password():
                     l=20,
                     r=20
                 ),
+
                 showlegend=True
             )
+
 
             st.plotly_chart(
                 fig_pie,
                 use_container_width=True
             )
+
 
         # ====================================================
         # ADD NEW MONTH
@@ -1040,40 +1276,69 @@ if check_password():
                 "### 📝 Neuen Monat hinzufügen"
             )
 
+
             with st.form(
                 "add_form",
                 clear_on_submit=False
             ):
 
-                input_date = st.date_input(
-                    "Stichtag",
-                    datetime.now()
+                input_date = (
+                    st.date_input(
+                        "Stichtag",
+                        datetime.now()
+                    )
                 )
 
-                v_liq_in = st.number_input(
-                    "Liquide Mittel (CHF)",
-                    value=float(v_liq)
+
+                v_liq_in = (
+                    st.number_input(
+                        "Liquide Mittel (CHF)",
+                        value=float(
+                            v_liq
+                        )
+                    )
                 )
 
-                v_spar_in = st.number_input(
-                    "Sparkapital (CHF)",
-                    value=float(v_spar)
+
+                v_spar_in = (
+                    st.number_input(
+                        "Sparkapital (CHF)",
+                        value=float(
+                            v_spar
+                        )
+                    )
                 )
 
-                v_boerse_in = st.number_input(
-                    "Investiertes Kapital (CHF)",
-                    value=float(v_boerse)
+
+                v_boerse_in = (
+                    st.number_input(
+                        "Investiertes Kapital (CHF)",
+                        value=float(
+                            v_boerse
+                        )
+                    )
                 )
 
-                v_priv_in = st.number_input(
-                    "Private Vorsorge (CHF)",
-                    value=float(v_priv)
+
+                v_priv_in = (
+                    st.number_input(
+                        "Private Vorsorge (CHF)",
+                        value=float(
+                            v_priv
+                        )
+                    )
                 )
 
-                v_lpp_in = st.number_input(
-                    "LPP (Pensionskasse - CHF)",
-                    value=float(v_lpp)
+
+                v_lpp_in = (
+                    st.number_input(
+                        "LPP (Pensionskasse - CHF)",
+                        value=float(
+                            v_lpp
+                        )
+                    )
                 )
+
 
                 if st.form_submit_button(
                     "💾 Monat speichern"
@@ -1100,17 +1365,20 @@ if check_password():
 
                         "LPP":
                             v_lpp_in
-
                     }])
 
+
                     df_history = df_history[
-                        df_history["Datum"]
+                        df_history[
+                            "Datum"
+                        ]
                         != pd.to_datetime(
                             new_row[
                                 "Datum"
                             ].iloc[0]
                         )
                     ]
+
 
                     df_all = pd.concat(
                         [
@@ -1120,11 +1388,15 @@ if check_password():
                         ignore_index=True
                     )
 
-                    df_all["Datum"] = (
-                        pd.to_datetime(
-                            df_all["Datum"]
-                        )
+
+                    df_all[
+                        "Datum"
+                    ] = pd.to_datetime(
+                        df_all[
+                            "Datum"
+                        ]
                     )
+
 
                     df_all = (
                         df_all
@@ -1133,34 +1405,44 @@ if check_password():
                         )
                     )
 
+
                     df_all.to_csv(
                         DATA_FILE,
                         index=False
                     )
 
+
                     st.success(
                         "Erfolgreich gespeichert!"
                     )
 
+
                     st.rerun()
+
 
             # =================================================
             # DELETE ENTRY
             # =================================================
 
-            st.markdown("---")
+            st.divider()
+
 
             st.markdown(
                 "### 🗑️ Eintrag löschen"
             )
 
-            df_history["Datum_Str"] = (
+
+            df_history[
+                "Datum_Str"
+            ] = (
                 df_history[
                     "Datum"
-                ].dt.strftime(
+                ]
+                .dt.strftime(
                     "%Y-%m-%d"
                 )
             )
+
 
             all_dates = (
                 df_history[
@@ -1170,15 +1452,19 @@ if check_password():
                 .tolist()
             )
 
+
             with st.form(
                 "delete_form",
                 clear_on_submit=True
             ):
 
-                date_to_delete = st.selectbox(
-                    "Wähle das Datum aus, das gelöscht werden soll:",
-                    all_dates
+                date_to_delete = (
+                    st.selectbox(
+                        "Wähle das Datum aus, das gelöscht werden soll:",
+                        all_dates
+                    )
                 )
+
 
                 if st.form_submit_button(
                     "❌ Ausgewählten Monat "
@@ -1192,17 +1478,22 @@ if check_password():
                         != date_to_delete
                     ]
 
-                    df_save = df_all.drop(
-                        columns=[
-                            "Datum_Str"
-                        ],
-                        errors="ignore"
+
+                    df_save = (
+                        df_all.drop(
+                            columns=[
+                                "Datum_Str"
+                            ],
+                            errors="ignore"
+                        )
                     )
+
 
                     df_save.to_csv(
                         DATA_FILE,
                         index=False
                     )
+
 
                     st.success(
                         f"Eintrag vom "
@@ -1210,17 +1501,21 @@ if check_password():
                         "wurde erfolgreich gelöscht!"
                     )
 
+
                     st.rerun()
+
 
         # ====================================================
         # TOTAL WEALTH EVOLUTION
         # ====================================================
 
-        st.markdown("---")
+        st.divider()
+
 
         st.markdown(
             "### 📈 Entwicklung Gesamtvermögen"
         )
+
 
         df_history[
             "Gesamtvermoegen"
@@ -1242,7 +1537,9 @@ if check_password():
             ]
         )
 
+
         fig_total = go.Figure()
+
 
         fig_total.add_trace(
             go.Scatter(
@@ -1264,13 +1561,15 @@ if check_password():
                     color="#2563eb"
                 ),
 
-                hovertemplate=
+                hovertemplate=(
                     "%{x|%d.%m.%Y}<br>"
                     + "Gesamtvermögen: "
                     + "%{y:,.0f} CHF"
                     + "<extra></extra>"
+                )
             )
         )
+
 
         fig_total.update_layout(
 
@@ -1288,10 +1587,12 @@ if check_password():
             )
         )
 
+
         st.plotly_chart(
             fig_total,
             use_container_width=True
         )
+
 
         # ====================================================
         # STACKED ASSET EVOLUTION
@@ -1301,11 +1602,13 @@ if check_password():
             "### 📊 Entwicklung nach Vermögensklasse"
         )
 
+
         df_history[
             "Liquidität"
         ] = df_history[
             "Liquide_Mittel"
         ]
+
 
         df_history[
             "Sparkapital_Klasse"
@@ -1313,11 +1616,13 @@ if check_password():
             "Sparvermoegen"
         ]
 
+
         df_history[
             "Investments"
         ] = df_history[
             "Boerse"
         ]
+
 
         df_history[
             "Vorsorge_Privat"
@@ -1325,13 +1630,16 @@ if check_password():
             "Private_Vorsorge"
         ]
 
+
         df_history[
             "Pensionskasse_Klasse"
         ] = df_history[
             "LPP"
         ]
 
+
         fig_trend = go.Figure()
+
 
         fig_trend.add_trace(
             go.Scatter(
@@ -1353,6 +1661,7 @@ if check_password():
             )
         )
 
+
         fig_trend.add_trace(
             go.Scatter(
                 x=df_history[
@@ -1372,6 +1681,7 @@ if check_password():
                 )
             )
         )
+
 
         fig_trend.add_trace(
             go.Scatter(
@@ -1393,6 +1703,7 @@ if check_password():
             )
         )
 
+
         fig_trend.add_trace(
             go.Scatter(
                 x=df_history[
@@ -1412,6 +1723,7 @@ if check_password():
                 )
             )
         )
+
 
         fig_trend.add_trace(
             go.Scatter(
@@ -1433,6 +1745,7 @@ if check_password():
             )
         )
 
+
         fig_trend.update_layout(
 
             hovermode="x unified",
@@ -1449,10 +1762,12 @@ if check_password():
             )
         )
 
+
         st.plotly_chart(
             fig_trend,
             use_container_width=True
         )
+
 
         # ====================================================
         # HISTORICAL TABLE
@@ -1461,6 +1776,7 @@ if check_password():
         st.markdown(
             "### 🗒️ Komplette historische Tabelle"
         )
+
 
         st.dataframe(
 
