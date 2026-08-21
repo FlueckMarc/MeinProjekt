@@ -70,7 +70,7 @@ st.markdown("""
 # NAVIGATION
 # =========================================================
 
-nav1, nav2, nav3 = st.columns(3)
+nav1, nav2, nav3, nav4 = st.columns(4)
 
 with nav1:
     st.page_link(
@@ -80,11 +80,17 @@ with nav1:
 
 with nav2:
     st.page_link(
+        "pages/1_Budget.py",
+        label="💰 Budget"
+    )
+
+with nav3:
+    st.page_link(
         "pages/2_Hypothek.py",
         label="🏡 Hypothek"
     )
 
-with nav3:
+with nav4:
     st.page_link(
         "pages/3_Prognose.py",
         label="🔮 Prognose"

@@ -34,7 +34,7 @@ st.markdown("""
 # NAVIGATION
 # ============================================================
 
-nav1, nav2, nav3, nav5 = st.columns(5)
+nav1, nav2, nav3, nav5 = st.columns(4)
 
 with nav1:
     st.page_link(
