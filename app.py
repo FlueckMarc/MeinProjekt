@@ -12,7 +12,7 @@ from datetime import datetime
 
 st.set_page_config(
     page_title="Personal Finance Dashboard",
-    page_icon="🦅",
+    page_icon="寿",
     layout="wide"
 )
 
@@ -603,7 +603,7 @@ if check_password():
         # ====================================================
 
         st.title(
-            "🦅 Mein Vermögens-Dashboard"
+            "寿 Mein Vermögens-Dashboard"
         )
 
 
@@ -631,54 +631,6 @@ if check_password():
                 "ℹ️ Kein aktueller Depotwert gefunden. "
                 "Der gespeicherte Wert aus "
                 "vermoegensdaten.csv wird verwendet."
-            )
-
-
-        # ====================================================
-        # TOTAL WEALTH
-        # ====================================================
-
-        st.markdown(
-            "## 🦅 Gesamtvermögen"
-        )
-
-
-        total_col1, total_col2 = (
-            st.columns(
-                [2, 1]
-            )
-        )
-
-
-        with total_col1:
-
-            st.metric(
-                label="Gesamtvermögen",
-
-                value=format_chf(
-                    total_assets
-                ),
-
-                delta=(
-                    f"{format_change(total_change)} "
-                    f"({total_change_percent:+.2f}%)"
-                )
-            )
-
-
-        with total_col2:
-
-            st.metric(
-                label="Stichtag",
-
-                value=(
-                    latest_entry[
-                        "Datum"
-                    ]
-                    .strftime(
-                        "%d.%m.%Y"
-                    )
-                )
             )
 
 
@@ -758,30 +710,55 @@ if check_password():
 
 
         # ====================================================
-        # YEAR-TO-DATE DISPLAY
+        # GESAMTVERMÖGEN & ENTWICKLUNG
         # ====================================================
 
         st.markdown(
-            f"### 📅 Entwicklung {current_year}"
+            "## 寿 Gesamtvermögen"
         )
 
 
         (
-            ytd_col1,
-            ytd_col2,
-            ytd_col3
-        ) = st.columns(3)
+            total_col1,
+            total_col2,
+            total_col3,
+            total_col4
+        ) = st.columns(4)
 
 
-        with ytd_col1:
+        with total_col1:
 
             st.metric(
-                label=(
-                    "📈 Veränderung seit "
-                    "Jahresbeginn"
-                ),
+                label="💰 Gesamtvermögen",
 
                 value=format_chf(
+                    total_assets
+                ),
+
+                delta=(
+                    f"{format_change(total_change)} "
+                    f"({total_change_percent:+.2f}%)"
+                )
+            )
+
+
+        with total_col2:
+
+            st.metric(
+                label="📅 Vermögen am Jahresanfang",
+
+                value=format_chf(
+                    year_start_assets
+                )
+            )
+
+
+        with total_col3:
+
+            st.metric(
+                label="📈 Veränderung seit Jahresbeginn",
+
+                value=format_change(
                     ytd_change
                 ),
 
@@ -791,21 +768,7 @@ if check_password():
             )
 
 
-        with ytd_col2:
-
-            st.metric(
-                label=(
-                    "📅 Vermögen am "
-                    "Jahresanfang"
-                ),
-
-                value=format_chf(
-                    year_start_assets
-                )
-            )
-
-
-        with ytd_col3:
+        with total_col4:
 
             st.metric(
                 label="💰 Aktuelles Vermögen",
