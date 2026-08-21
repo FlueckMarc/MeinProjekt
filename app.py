@@ -13,32 +13,11 @@ st.set_page_config(
 
 
 # ============================================================
-# SIDEBAR AUSBLENDEN
-# ============================================================
-
-st.markdown("""
-<style>
-    [data-testid="stSidebar"] {
-        display: none;
-    }
-
-    [data-testid="collapsedControl"] {
-        display: none;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-
-# ============================================================
-# CONFIGURATION
+# LOGIN
 # ============================================================
 
 SECRET_PASSWORD = "viper01"
 
-
-# ============================================================
-# LOGIN
-# ============================================================
 
 def check_password():
 
@@ -94,11 +73,86 @@ def check_password():
 
 
 # ============================================================
-# APP STARTEN
+# APP
 # ============================================================
 
 if check_password():
 
-    st.switch_page(
-        "pages/0_Uebersicht.py"
+    # ========================================================
+    # SEITEN DEFINIEREN
+    # ========================================================
+
+    uebersicht = st.Page(
+        "pages/0_Uebersicht.py",
+        title="Übersicht",
+        icon="寿",
+        default=True
     )
+
+    budget = st.Page(
+        "pages/1_Budget.py",
+        title="Budget",
+        icon="💰"
+    )
+
+    hypothek = st.Page(
+        "pages/2_Hypothek.py",
+        title="Hypothek",
+        icon="🏠"
+    )
+
+    prognose = st.Page(
+        "pages/3_Prognose.py",
+        title="Prognose",
+        icon="🔮"
+    )
+
+    depot = st.Page(
+        "pages/4_Depot.py",
+        title="Depot",
+        icon="📈"
+    )
+
+
+    # ========================================================
+    # NAVIGATION OBEN
+    # ========================================================
+
+    pg = st.navigation(
+        [
+            uebersicht,
+            budget,
+            hypothek,
+            prognose,
+            depot
+        ],
+        position="top"
+    )
+
+
+    # ========================================================
+    # ABMELDEN
+    # ========================================================
+
+    logout_col1, logout_col2 = st.columns(
+        [6, 1]
+    )
+
+    with logout_col2:
+
+        if st.button(
+            "🔒 Abmelden"
+        ):
+
+            st.session_state[
+                "password_correct"
+            ] = False
+
+            st.rerun()
+
+
+    # ========================================================
+    # AKTUELLE SEITE AUSFÜHREN
+    # ========================================================
+
+    pg.run()
