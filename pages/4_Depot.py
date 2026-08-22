@@ -2853,8 +2853,72 @@ anzeige = pd.concat(
 )
 
 
+def farbe_nach_vorzeichen(wert):
+    """
+    Positive Werte grün, negative rot, unveränderte/0 Werte weiss.
+    Wird nur auf die Variations- und Gewinnspalten angewendet.
+    """
+    if wert is None:
+        return ""
+
+    text = str(wert).strip()
+
+    if text == "" or text == "Nicht verfügbar":
+        return ""
+
+    # Variationsspalten beginnen bereits mit + oder -
+    if text.startswith("+"):
+        return "color: #21c55d; font-weight: 600;"
+    if text.startswith("-"):
+        return "color: #ef4444; font-weight: 600;"
+
+    # Gewinn CHF ist z.B. "CHF 1'234" oder "CHF -250"
+    if text.startswith("CHF "):
+        zahl_text = (
+            text.replace("CHF", "")
+                .replace("'", "")
+                .replace(",", "")
+                .strip()
+        )
+        try:
+            zahl = float(zahl_text)
+            if zahl > 0:
+                return "color: #21c55d; font-weight: 600;"
+            if zahl < 0:
+                return "color: #ef4444; font-weight: 600;"
+            return "color: #ffffff;"
+        except Exception:
+            return ""
+
+    # Gewinn % ist z.B. "+12.34 %" / "-5.20 %" / "+0.00 %"
+    if text.endswith("%"):
+        zahl_text = text.replace("%", "").replace("+", "").strip()
+        try:
+            zahl = float(zahl_text)
+            if zahl > 0:
+                return "color: #21c55d; font-weight: 600;"
+            if zahl < 0:
+                return "color: #ef4444; font-weight: 600;"
+            return "color: #ffffff;"
+        except Exception:
+            return ""
+
+    return ""
+
+
+anzeige_styled = anzeige.style.map(
+    farbe_nach_vorzeichen,
+    subset=[
+        "Tagesvariation",
+        "Wochenentwicklung",
+        "Gewinn CHF",
+        "Gewinn %"
+    ]
+)
+
+
 st.dataframe(
-    anzeige,
+    anzeige_styled,
     use_container_width=True,
     hide_index=True
 )
