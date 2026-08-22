@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import requests
 import re
 import html
+import html
 
 
 # =========================================================
@@ -445,6 +446,166 @@ def format_percent(wert):
         return "Nicht verfügbar"
 
     return f"{wert:+.2f} %"
+
+
+
+
+# =========================================================
+# FINANZEN.CH - PRIMÄRE KURSQUELLE FÜR BÖRSENTITEL
+# =========================================================
+
+FINANZEN_URLS = {
+    "ABBN.SW": ["https://www.finanzen.ch/aktien/abb-aktie"],
+    "ACLN.SW": [
+        "https://www.finanzen.ch/aktien/accelleron_industries-aktie",
+        "https://www.finanzen.ch/aktien/accelleron_industries-aktie-aktie",
+    ],
+    "NOVN.SW": [
+        "https://www.finanzen.ch/aktien/novartis-aktie",
+        "https://www.finanzen.ch/aktien/novartis-aktie-aktie",
+    ],
+    "ROG.SW": ["https://www.finanzen.ch/aktien/roche-aktie"],
+    "SDZ.SW": ["https://www.finanzen.ch/aktien/sandoz-aktie"],
+    "NESN.SW": ["https://www.finanzen.ch/aktien/nestle-aktie"],
+    "SLHN.SW": ["https://www.finanzen.ch/aktien/swiss_life-aktie"],
+    "ZURN.SW": ["https://www.finanzen.ch/aktien/zurich-aktie"],
+    "EL": ["https://www.finanzen.ch/aktien/estee_lauder-aktie"],
+    "V": ["https://www.finanzen.ch/aktien/visa-aktie"],
+    "SAP": ["https://www.finanzen.ch/aktien/sap-aktie"],
+    "CRM": ["https://www.finanzen.ch/aktien/salesforce-aktie"],
+    "BLDP": ["https://www.finanzen.ch/aktien/ballard_power-aktie"],
+    "HIVE": [
+        "https://www.finanzen.ch/aktien/hive_digital_technologies-aktie",
+        "https://www.finanzen.ch/aktien/hive_blockchain_technologies-aktie",
+    ],
+    "LECN.SW": ["https://www.finanzen.ch/aktien/leclanche-aktie"],
+    "NVDA": ["https://www.finanzen.ch/aktien/nvidia-aktie"],
+    "SREN.SW": ["https://www.finanzen.ch/aktien/swiss_re-aktie"],
+    "UBSG.SW": ["https://www.finanzen.ch/aktien/ubs-aktie"],
+    "HBLN.SW": ["https://www.finanzen.ch/aktien/hypothekarbank_lenzburg-aktie"],
+    "VALE": ["https://www.finanzen.ch/aktien/vale-aktie"],
+}
+
+
+def _text_aus_html(raw_html):
+    text = html.unescape(raw_html or "")
+    text = re.sub(r"<script\b[^>]*>.*?</script>", " ", text, flags=re.I | re.S)
+    text = re.sub(r"<style\b[^>]*>.*?</style>", " ", text, flags=re.I | re.S)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _parse_finanzen_zahl(wert):
+    if wert is None:
+        return None
+    wert = str(wert).replace("’", "'").replace(" ", "").strip()
+    # Schweizer Tausendertrennzeichen entfernen
+    wert = wert.replace("'", "")
+    if "," in wert and "." in wert:
+        if wert.rfind(",") > wert.rfind("."):
+            wert = wert.replace(".", "").replace(",", ".")
+        else:
+            wert = wert.replace(",", "")
+    elif "," in wert:
+        wert = wert.replace(",", ".")
+    try:
+        return float(wert)
+    except Exception:
+        return None
+
+
+def lade_kurs_finanzen(ticker, waehrung):
+    """
+    Primäre Kursquelle für börsengehandelte Titel.
+    Liest den 'Aktienkurs ... in <Währung>' und die dazugehörige Kurszeit.
+    Rückgabe: (kurs, kurszeit, kursart)
+    """
+    urls = FINANZEN_URLS.get(ticker, [])
+    if not urls:
+        return float("nan"), None, "Nicht verfügbar"
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/151.0 Safari/537.36"
+        ),
+        "Accept-Language": "de-CH,de;q=0.9,en;q=0.8",
+        "Cache-Control": "no-cache",
+    }
+
+    for url in urls:
+        try:
+            r = requests.get(url, headers=headers, timeout=20)
+            if r.status_code != 200:
+                continue
+            text = _text_aus_html(r.text)
+            if not text:
+                continue
+
+            # Möglichst genau den gewünschten Währungsabschnitt verwenden.
+            marker = re.search(
+                rf"Aktienkurs\s+.+?\s+in\s+{re.escape(waehrung)}\b",
+                text,
+                flags=re.I,
+            )
+            if marker:
+                abschnitt = text[marker.start(): marker.start() + 2200]
+            else:
+                # Fallback: Kopfbereich der Seite; dort steht oft
+                # '<Kurs> <Währung> ... <Börse>'.
+                abschnitt = text[:2200]
+
+            # 1) Bevorzugt: Kurs direkt vor Kurszeit-Block.
+            # Typischer Text: '586.00 | 1.60 | 0.27 % Kurszeit ...'
+            m = re.search(
+                r"([0-9]{1,7}(?:[.'’][0-9]{3})*(?:[.,][0-9]{1,6})?)"
+                r"\s*\|\s*[+\-]?[0-9]{1,7}(?:[.'’][0-9]{3})*(?:[.,][0-9]{1,6})?"
+                r"\s*\|\s*[+\-]?[0-9]{1,4}(?:[.,][0-9]+)?\s*%"
+                r".{0,120}?Kurszeit",
+                abschnitt,
+                flags=re.I | re.S,
+            )
+
+            # 2) Fallback: erste plausible Zahl im Währungsabschnitt.
+            if not m:
+                m = re.search(
+                    r"\b([0-9]{1,7}(?:[.'’][0-9]{3})*(?:[.,][0-9]{1,6})?)\b",
+                    abschnitt,
+                )
+
+            if not m:
+                continue
+
+            kurs = _parse_finanzen_zahl(m.group(1))
+            if kurs is None or kurs <= 0:
+                continue
+
+            kurszeit = None
+            zeit_match = re.search(
+                r"Kurszeit\s+(?:(\d{2}\.\d{2}\.\d{4})\s+)?"
+                r"(\d{2}:\d{2}(?::\d{2})?)",
+                abschnitt,
+                flags=re.I,
+            )
+            if zeit_match:
+                datum_txt = zeit_match.group(1)
+                zeit_txt = zeit_match.group(2)
+                if datum_txt:
+                    try:
+                        kurszeit = pd.to_datetime(
+                            f"{datum_txt} {zeit_txt}",
+                            dayfirst=True,
+                        )
+                    except Exception:
+                        kurszeit = None
+
+            return float(kurs), kurszeit, "Finanzen.ch"
+
+        except Exception:
+            continue
+
+    return float("nan"), None, "Nicht verfügbar"
 
 
 # =========================================================
@@ -914,6 +1075,7 @@ def lade_kurshistorie(ticker):
 
 def lade_aktuellen_kurs(ticker, waehrung=None):
 
+    # Zertifikat: bestehende Speziallogik beibehalten.
     if ticker == "ROBTTQ":
 
         serie = lade_robotics_kurs()
@@ -921,9 +1083,20 @@ def lade_aktuellen_kurs(ticker, waehrung=None):
         if serie.empty:
             return float("nan"), None, "Nicht verfügbar"
 
-        return float(serie.iloc[-1]), None, "Letzter Kurs"
+        return float(serie.iloc[-1]), None, "Finanzen.ch / Zertifikat"
 
 
+    # 1. Primär: finanzen.ch
+    kurs, zeit, kursart = lade_kurs_finanzen(
+        ticker,
+        waehrung
+    )
+
+    if not pd.isna(kurs):
+        return kurs, zeit, kursart
+
+
+    # 2. Fallback: yfinance
     if ticker == "ROG.SW":
 
         for alternative in [
@@ -940,15 +1113,20 @@ def lade_aktuellen_kurs(ticker, waehrung=None):
             )
 
             if not pd.isna(kurs):
-                return kurs, zeit, kursart
+                return kurs, zeit, "Yahoo Fallback"
 
         return float("nan"), None, "Nicht verfügbar"
 
 
-    return lade_aktuellen_kurs_yfinance(
+    kurs, zeit, kursart = lade_aktuellen_kurs_yfinance(
         yahoo_ticker(ticker),
         waehrung
     )
+
+    if not pd.isna(kurs):
+        return kurs, zeit, "Yahoo Fallback"
+
+    return float("nan"), None, "Nicht verfügbar"
 
 
 # =========================================================
@@ -3172,7 +3350,7 @@ aktuell.to_csv(
 st.divider()
 
 st.caption(
-    "Aktienkurse werden beim Aktualisieren neu abgerufen. "
+    "Aktienkurse werden primär über finanzen.ch und bei Bedarf über Yahoo Finance aktualisiert. "
     "Die UBS- und BCV-Fonds werden über die hinterlegten "
     "Valor-/ISIN-Daten aktualisiert. Fonds-NAVs können "
     "gegenüber Börsenkursen zeitverzögert sein."
