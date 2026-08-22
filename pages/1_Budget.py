@@ -247,7 +247,7 @@ input_date = st.date_input(
 
 selected_date = pd.to_datetime(
     input_date
-)
+).replace(day=1)
 
 
 # ============================================================
@@ -259,7 +259,8 @@ existing_row = None
 if not df.empty:
 
     matching = df[
-        df["Datum"] == selected_date
+        (df["Datum"].dt.year == selected_date.year)
+        & (df["Datum"].dt.month == selected_date.month)
     ]
 
     if not matching.empty:
@@ -274,6 +275,10 @@ if not df.empty:
 income_values = {}
 deduction_values = {}
 expense_values = {}
+
+# Eigene Widget-Keys pro ausgewähltem Monat.
+# Dadurch lädt Streamlit beim Monatswechsel die gespeicherten Werte neu.
+month_key = selected_date.strftime("%Y_%m")
 
 
 col1, col2, col3 = st.columns(3)
@@ -306,7 +311,7 @@ with col1:
             min_value=0.0,
             value=old_value,
             step=100.0,
-            key=f"income_{category}"
+            key=f"income_{month_key}_{category}"
         )
 
 
@@ -337,7 +342,7 @@ with col2:
             min_value=0.0,
             value=old_value,
             step=50.0,
-            key=f"deduction_{category}"
+            key=f"deduction_{month_key}_{category}"
         )
 
 
@@ -368,7 +373,7 @@ with col3:
             min_value=0.0,
             value=old_value,
             step=50.0,
-            key=f"expense_{category}"
+            key=f"expense_{month_key}_{category}"
         )
 
 
@@ -481,7 +486,10 @@ if st.button(
     if not df.empty:
 
         df = df[
-            df["Datum"] != selected_date
+            ~(
+                (df["Datum"].dt.year == selected_date.year)
+                & (df["Datum"].dt.month == selected_date.month)
+            )
         ]
 
     # Neuer Monat hinzufügen
