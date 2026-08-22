@@ -425,7 +425,7 @@ def format_variation(wert, prozent):
         return "Nicht verfügbar"
 
     return (
-        f"{wert:+,.0f} CHF "
+        f"{wert:+,.2f} CHF "
         f"({prozent:+.2f} %)"
         .replace(",", "'")
     )
@@ -2628,7 +2628,7 @@ anzeige["Wochenentwicklung"] = (
 anzeige["Wert CHF"] = (
     anzeige["Wert CHF"]
     .apply(
-        format_chf
+        format_chf_total
     )
 )
 
@@ -2636,7 +2636,7 @@ anzeige["Wert CHF"] = (
 anzeige["Gewinn CHF"] = (
     anzeige["Gewinn CHF"]
     .apply(
-        format_chf
+        format_chf_total
     )
 )
 
@@ -2948,7 +2948,7 @@ if not ubs_detail.empty:
             lambda x:
             "Nicht verfügbar"
             if pd.isna(x)
-            else f"{x:,.4f}"
+            else f"{x:,.2f}"
             .replace(",", "'")
         )
     )
@@ -2957,7 +2957,7 @@ if not ubs_detail.empty:
     ubs_anzeige["Wert CHF"] = (
         ubs_anzeige["Wert CHF"]
         .apply(
-            format_chf
+            format_chf_total
         )
     )
 
