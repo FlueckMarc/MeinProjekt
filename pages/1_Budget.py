@@ -34,13 +34,13 @@ DEFAULT_CATEGORIES = {
         "Weitere Einnahmen"
     ],
     "Abzüge": [
-        "Sozialabgaben",
-        "Steuern"
+        "Sozialabgaben"
     ],
     "Ausgaben": [
+        "Steuern",
         "Wohnen / Hypothek / Miete",
         "Krankenkasse",
-        "Auto / Transport",
+        "Cheetah",
         "Lebensmittel",
         "Freizeit",
         "Versicherungen",
@@ -82,6 +82,30 @@ def load_categories():
 
 
 categories_df = load_categories()
+
+# Steuern gehören im Monatsbudget zu den Ausgaben.
+# Bestehende budget_kategorien.csv wird automatisch angepasst.
+if "Steuern" in categories_df["Kategorie"].values:
+    categories_df.loc[
+        categories_df["Kategorie"] == "Steuern",
+        "Gruppe"
+    ] = "Ausgaben"
+else:
+    categories_df = pd.concat(
+        [
+            categories_df,
+            pd.DataFrame([{
+                "Kategorie": "Steuern",
+                "Gruppe": "Ausgaben"
+            }])
+        ],
+        ignore_index=True
+    )
+
+categories_df.to_csv(
+    CATEGORY_FILE,
+    index=False
+)
 
 
 # ============================================================
