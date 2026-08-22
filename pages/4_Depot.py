@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 from pathlib import Path
-from datetime import date
+from datetime import date, datetime, time
+from zoneinfo import ZoneInfo
 import requests
 import re
 import html
@@ -515,105 +516,123 @@ def lade_kurs_yfinance(ticker):
         return pd.Series(dtype=float)
 
 
-def lade_aktuellen_kurs_yfinance(ticker):
+def lade_aktuellen_kurs_yfinance(ticker, waehrung=None):
 
     """
-    Holt zuerst den letzten verfügbaren Intraday-Kurs.
-    Dadurch wird nicht nur der eventuell verzögerte Daily-Close
-    aus der Tageshistorie verwendet.
+    Liefert den aktuellsten sinnvollen Börsenkurs.
+
+    Logik:
+    - CH/EUR: laufender Intraday-Kurs; nach 17:30 Schweizer Zeit
+      bevorzugt Schlusskurs des heutigen Handelstags.
+    - USD: laufender Intraday-Kurs; nach 22:00 Schweizer Zeit
+      bevorzugt Schlusskurs des heutigen Handelstags.
+    - Falls der Daily-Close für heute noch nicht publiziert ist,
+      bleibt der letzte Intraday-Kurs die bessere Quelle.
+    - Wochenende/vor Börsenöffnung: letzter verfügbarer Kurs.
 
     Rückgabe:
-        (kurs, kursdatum)
+        (kurs, kurszeit, kursart)
     """
 
     obj = yf.Ticker(ticker)
+    ch_tz = ZoneInfo("Europe/Zurich")
+    jetzt_ch = datetime.now(ch_tz)
 
-    # 1. Intraday 1 Minute
+    if waehrung == "USD":
+        schlusszeit = time(22, 0)
+    else:
+        schlusszeit = time(17, 30)
+
+    # 1. Letzten Intraday-Kurs holen
+    intraday_kurs = float("nan")
+    intraday_zeit = None
+
+    for interval, period in [("1m", "5d"), ("5m", "10d"), ("1h", "1mo")]:
+        try:
+            data = obj.history(
+                period=period,
+                interval=interval,
+                auto_adjust=False,
+                prepost=False
+            )
+
+            close = _close_serie(data)
+
+            if not close.empty:
+                intraday_kurs = float(close.iloc[-1])
+                intraday_zeit = pd.to_datetime(close.index[-1])
+                break
+
+        except Exception:
+            pass
+
+    # 2. Daily-Close holen
+    daily = lade_kurs_yfinance(ticker)
+    daily_kurs = float("nan")
+    daily_zeit = None
+
+    if not daily.empty:
+        daily_kurs = float(daily.iloc[-1])
+        try:
+            daily_zeit = pd.to_datetime(daily.index[-1])
+        except Exception:
+            daily_zeit = None
+
+    # 3. Nach Börsenschluss nur dann Daily-Close bevorzugen,
+    #    wenn er wirklich vom heutigen Schweizer Kalendertag ist.
+    ist_werktag = jetzt_ch.weekday() < 5
+    nach_schluss = ist_werktag and jetzt_ch.time() >= schlusszeit
+
+    if nach_schluss and daily_zeit is not None and not pd.isna(daily_kurs):
+        try:
+            daily_tag = pd.to_datetime(daily_zeit).date()
+            if daily_tag == jetzt_ch.date():
+                return daily_kurs, daily_zeit, "Schlusskurs"
+        except Exception:
+            pass
+
+    # 4. Sonst Intraday bevorzugen. Das ist während des Handels
+    #    und direkt nach Handelsschluss meist aktueller als Daily.
+    if not pd.isna(intraday_kurs):
+        kursart = "Laufender Kurs"
+
+        if intraday_zeit is not None:
+            try:
+                intraday_tag = pd.to_datetime(intraday_zeit).date()
+                if (
+                    intraday_tag < jetzt_ch.date()
+                    or nach_schluss
+                    or not ist_werktag
+                ):
+                    kursart = "Letzter Kurs"
+            except Exception:
+                pass
+
+        return intraday_kurs, intraday_zeit, kursart
+
+    # 5. fast_info als Fallback
     try:
-
-        data = obj.history(
-            period="5d",
-            interval="1m",
-            auto_adjust=False,
-            prepost=False
-        )
-
-        close = _close_serie(data)
-
-        if not close.empty:
-
-            kurs = float(close.iloc[-1])
-            zeit = pd.to_datetime(close.index[-1])
-
-            return kurs, zeit
-
-    except Exception:
-        pass
-
-    # 2. Intraday 1 Stunde als Fallback
-    try:
-
-        data = obj.history(
-            period="10d",
-            interval="1h",
-            auto_adjust=False,
-            prepost=False
-        )
-
-        close = _close_serie(data)
-
-        if not close.empty:
-
-            kurs = float(close.iloc[-1])
-            zeit = pd.to_datetime(close.index[-1])
-
-            return kurs, zeit
-
-    except Exception:
-        pass
-
-    # 3. fast_info
-    try:
-
         info = obj.fast_info
 
-        for key in [
-            "last_price",
-            "regular_market_price"
-        ]:
-
+        for key in ["last_price", "regular_market_price"]:
             try:
                 wert = info[key]
             except Exception:
                 wert = getattr(info, key, None)
 
             if wert is not None:
-
                 wert = float(wert)
-
                 if wert > 0:
-                    return wert, None
+                    return wert, None, "Letzter Kurs"
 
     except Exception:
         pass
 
-    # 4. Daily-Close als letzter Fallback
-    historie = lade_kurs_yfinance(ticker)
+    # 6. Daily als letzter Fallback
+    if not pd.isna(daily_kurs):
+        return daily_kurs, daily_zeit, "Schlusskurs"
 
-    if not historie.empty:
-
-        kurs = float(historie.iloc[-1])
-
-        try:
-            zeit = pd.to_datetime(
-                historie.index[-1]
-            )
-        except Exception:
-            zeit = None
-
-        return kurs, zeit
-
-    return float("nan"), None
+    return float("nan"), None, "Nicht verfügbar"
 
 
 # =========================================================
@@ -893,16 +912,16 @@ def lade_kurshistorie(ticker):
     )
 
 
-def lade_aktuellen_kurs(ticker):
+def lade_aktuellen_kurs(ticker, waehrung=None):
 
     if ticker == "ROBTTQ":
 
         serie = lade_robotics_kurs()
 
         if serie.empty:
-            return float("nan"), None
+            return float("nan"), None, "Nicht verfügbar"
 
-        return float(serie.iloc[-1]), None
+        return float(serie.iloc[-1]), None, "Letzter Kurs"
 
 
     if ticker == "ROG.SW":
@@ -913,20 +932,22 @@ def lade_aktuellen_kurs(ticker):
             "RO.SW"
         ]:
 
-            kurs, zeit = (
+            kurs, zeit, kursart = (
                 lade_aktuellen_kurs_yfinance(
-                    alternative
+                    alternative,
+                    waehrung
                 )
             )
 
             if not pd.isna(kurs):
-                return kurs, zeit
+                return kurs, zeit, kursart
 
-        return float("nan"), None
+        return float("nan"), None, "Nicht verfügbar"
 
 
     return lade_aktuellen_kurs_yfinance(
-        yahoo_ticker(ticker)
+        yahoo_ticker(ticker),
+        waehrung
     )
 
 
@@ -993,8 +1014,9 @@ def aktualisiere_depot():
             pos["Ticker"]
         )
 
-        kurs, kurszeit = lade_aktuellen_kurs(
-            pos["Ticker"]
+        kurs, kurszeit, kursart = lade_aktuellen_kurs(
+            pos["Ticker"],
+            pos["Währung"]
         )
 
 
@@ -1173,9 +1195,10 @@ def aktualisiere_depot():
         else:
 
             try:
-                kursdatum = pd.to_datetime(
-                    kurszeit
-                ).strftime("%d.%m.%Y %H:%M")
+                ts = pd.to_datetime(kurszeit)
+                if ts.tzinfo is not None:
+                    ts = ts.tz_convert("Europe/Zurich")
+                kursdatum = ts.strftime("%d.%m.%Y %H:%M")
             except Exception:
                 kursdatum = ""
 
@@ -1195,6 +1218,8 @@ def aktualisiere_depot():
             "Kurs": kurs,
 
             "Kursdatum": kursdatum,
+
+            "Kursart": kursart,
 
             "Währung": pos["Währung"],
 
@@ -1587,10 +1612,8 @@ def aktualisiere_ubs_fonds():
 
     for fonds in ubs_fonds_positionen:
 
-        nav, nav_datum = (
-            lade_fonds_nav_mit_datum(
-                fonds["URL"]
-            )
+        nav = lade_fonds_nav(
+            fonds["URL"]
         )
 
 
@@ -1636,9 +1659,6 @@ def aktualisiere_ubs_fonds():
 
             "NAV":
                 nav,
-
-            "NAV-Datum":
-                nav_datum,
 
             "Währung":
                 fonds["Währung"],
@@ -2405,6 +2425,7 @@ anzeige = anzeige[
         "Anteile",
         "Kurs",
         "Kursdatum",
+        "Kursart",
         "Tagesvariation",
         "Wochenentwicklung",
         "Wert CHF",
@@ -2492,6 +2513,9 @@ def depot_total_zeile(depotname):
         "Kursdatum":
             "",
 
+        "Kursart":
+            "",
+
         "Tagesvariation":
             format_variation_total(
                 tagesvariation,
@@ -2534,6 +2558,9 @@ aktien_total_zeile = pd.DataFrame([{
         "",
 
     "Kursdatum":
+        "",
+
+    "Kursart":
         "",
 
     "Tagesvariation":
@@ -2652,9 +2679,6 @@ if not ubs_detail.empty:
         "NAV":
             "",
 
-        "NAV-Datum":
-            "",
-
         "Währung":
             "",
 
@@ -2682,7 +2706,6 @@ if not ubs_detail.empty:
                 "ISIN",
                 "Anteile",
                 "NAV",
-                "NAV-Datum",
                 "Währung",
                 "Wert CHF"
             ]
