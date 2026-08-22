@@ -2601,6 +2601,28 @@ anzeige["Kurs"] = (
 )
 
 
+def formatiere_kaufkurs(row):
+
+    einstand = row["Einstand"]
+
+    if pd.isna(einstand):
+        return ""
+
+    return (
+        f"{einstand:,.2f} "
+        f"{row['Währung']}"
+        .replace(",", "'")
+    )
+
+
+anzeige["Kaufkurs"] = (
+    anzeige.apply(
+        formatiere_kaufkurs,
+        axis=1
+    )
+)
+
+
 anzeige["Tagesvariation"] = (
     anzeige.apply(
         lambda row:
@@ -2657,6 +2679,7 @@ anzeige = anzeige[
         "Depot",
         "Name",
         "Anteile",
+        "Kaufkurs",
         "Kurs",
         "Kursdatum",
         "Kursart",
@@ -2741,6 +2764,9 @@ def depot_total_zeile(depotname):
         "Anteile":
             "",
 
+        "Kaufkurs":
+            "",
+
         "Kurs":
             "",
 
@@ -2786,6 +2812,9 @@ aktien_total_zeile = pd.DataFrame([{
         "ALLE AKTIEN",
 
     "Anteile":
+        "",
+
+    "Kaufkurs":
         "",
 
     "Kurs":
