@@ -40,7 +40,7 @@ DEFAULT_CATEGORIES = {
     "Ausgaben": [
         "Wohnen / Hypothek / Miete",
         "Krankenkasse",
-        "Cheetah",
+        "Auto / Transport",
         "Lebensmittel",
         "Freizeit",
         "Versicherungen",
@@ -590,6 +590,255 @@ if not df.empty:
     history_df = pd.DataFrame(
         history
     )
+
+
+    # --------------------------------------------------------
+    # EINNAHMEN VS. AUSGABEN NACH KATEGORIEN
+    # --------------------------------------------------------
+
+    st.markdown(
+        "### 💰 Einnahmen vs. Ausgaben"
+    )
+
+    vergleich_ansicht = st.radio(
+        "Ansicht",
+        [
+            "Monatlich",
+            "Gesamt"
+        ],
+        horizontal=True,
+        key="budget_vergleich_ansicht"
+    )
+
+    expense_categories_compare = categories_df[
+        categories_df["Gruppe"] == "Ausgaben"
+    ]["Kategorie"].tolist()
+
+    if vergleich_ansicht == "Monatlich":
+
+        monats_optionen = (
+            df["Datum"]
+            .dt.to_period("M")
+            .drop_duplicates()
+            .sort_values()
+            .tolist()
+        )
+
+        monats_labels = [
+            pd.Period(monat).strftime("%m.%Y")
+            for monat in monats_optionen
+        ]
+
+        ausgewaehltes_label = st.selectbox(
+            "Monat anzeigen",
+            monats_labels,
+            index=len(monats_labels) - 1,
+            key="budget_vergleich_monat"
+        )
+
+        ausgewaehlte_periode = monats_optionen[
+            monats_labels.index(ausgewaehltes_label)
+        ]
+
+        monats_zeilen = df[
+            df["Datum"].dt.to_period("M")
+            == ausgewaehlte_periode
+        ]
+
+        if not monats_zeilen.empty:
+
+            row = monats_zeilen.iloc[-1]
+
+            gross = 0.0
+            deductions = 0.0
+
+            for category in categories_df[
+                categories_df["Gruppe"] == "Einnahmen"
+            ]["Kategorie"]:
+
+                if category in row.index and pd.notna(row[category]):
+                    gross += float(row[category])
+
+            for category in categories_df[
+                categories_df["Gruppe"] == "Abzüge"
+            ]["Kategorie"]:
+
+                if category in row.index and pd.notna(row[category]):
+                    deductions += float(row[category])
+
+            netto = gross - deductions
+
+            chart_rows = [{
+                "Bereich": "Nettoeinnahmen",
+                "Kategorie": "Nettoeinnahmen",
+                "Betrag": netto
+            }]
+
+            ausgaben_total = 0.0
+
+            for category in expense_categories_compare:
+
+                if category in row.index and pd.notna(row[category]):
+                    value = float(row[category])
+
+                    if value > 0:
+                        ausgaben_total += value
+
+                        chart_rows.append({
+                            "Bereich": "Ausgaben",
+                            "Kategorie": category,
+                            "Betrag": value
+                        })
+
+            ueberschuss = netto - ausgaben_total
+
+            m1, m2, m3 = st.columns(3)
+
+            m1.metric(
+                "Nettoeinnahmen",
+                f"{netto:,.2f} CHF"
+            )
+
+            m2.metric(
+                "Ausgaben",
+                f"{ausgaben_total:,.2f} CHF"
+            )
+
+            m3.metric(
+                "Überschuss",
+                f"{ueberschuss:,.2f} CHF"
+            )
+
+            vergleich_df = pd.DataFrame(
+                chart_rows
+            )
+
+            fig_compare = px.bar(
+                vergleich_df,
+                x="Bereich",
+                y="Betrag",
+                color="Kategorie",
+                barmode="stack",
+                text_auto=".2s",
+                labels={
+                    "Bereich": "",
+                    "Betrag": "CHF",
+                    "Kategorie": "Kategorie"
+                }
+            )
+
+            fig_compare.update_layout(
+                legend_title_text="Kategorie"
+            )
+
+            st.plotly_chart(
+                fig_compare,
+                use_container_width=True
+            )
+
+    else:
+
+        gesamt_netto = 0.0
+        kategorien_summen = {
+            category: 0.0
+            for category in expense_categories_compare
+        }
+
+        for _, row in df.iterrows():
+
+            gross = 0.0
+            deductions = 0.0
+
+            for category in categories_df[
+                categories_df["Gruppe"] == "Einnahmen"
+            ]["Kategorie"]:
+
+                if category in row.index and pd.notna(row[category]):
+                    gross += float(row[category])
+
+            for category in categories_df[
+                categories_df["Gruppe"] == "Abzüge"
+            ]["Kategorie"]:
+
+                if category in row.index and pd.notna(row[category]):
+                    deductions += float(row[category])
+
+            gesamt_netto += gross - deductions
+
+            for category in expense_categories_compare:
+
+                if category in row.index and pd.notna(row[category]):
+                    kategorien_summen[category] += float(
+                        row[category]
+                    )
+
+        gesamt_ausgaben = sum(
+            kategorien_summen.values()
+        )
+
+        gesamt_ueberschuss = (
+            gesamt_netto
+            - gesamt_ausgaben
+        )
+
+        g1, g2, g3 = st.columns(3)
+
+        g1.metric(
+            "Nettoeinnahmen gesamt",
+            f"{gesamt_netto:,.2f} CHF"
+        )
+
+        g2.metric(
+            "Ausgaben gesamt",
+            f"{gesamt_ausgaben:,.2f} CHF"
+        )
+
+        g3.metric(
+            "Überschuss gesamt",
+            f"{gesamt_ueberschuss:,.2f} CHF"
+        )
+
+        chart_rows = [{
+            "Bereich": "Nettoeinnahmen",
+            "Kategorie": "Nettoeinnahmen",
+            "Betrag": gesamt_netto
+        }]
+
+        for category, value in kategorien_summen.items():
+
+            if value > 0:
+                chart_rows.append({
+                    "Bereich": "Ausgaben",
+                    "Kategorie": category,
+                    "Betrag": value
+                })
+
+        vergleich_df = pd.DataFrame(
+            chart_rows
+        )
+
+        fig_compare = px.bar(
+            vergleich_df,
+            x="Bereich",
+            y="Betrag",
+            color="Kategorie",
+            barmode="stack",
+            text_auto=".2s",
+            labels={
+                "Bereich": "",
+                "Betrag": "CHF",
+                "Kategorie": "Kategorie"
+            }
+        )
+
+        fig_compare.update_layout(
+            legend_title_text="Kategorie"
+        )
+
+        st.plotly_chart(
+            fig_compare,
+            use_container_width=True
+        )
 
 
     # --------------------------------------------------------
