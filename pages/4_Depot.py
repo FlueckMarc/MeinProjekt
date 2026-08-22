@@ -7,7 +7,6 @@ from zoneinfo import ZoneInfo
 import requests
 import re
 import html
-import html
 
 
 # =========================================================
@@ -146,6 +145,7 @@ positionen = [
         "Depot": "Swissquote",
         "Name": "Visa",
         "Ticker": "V",
+        "ISIN": "US92826C8394",
         "Anteile": 11,
         "Einstand": 202.11,
         "Währung": "USD"
@@ -155,15 +155,17 @@ positionen = [
         "Depot": "Swissquote",
         "Name": "SAP",
         "Ticker": "SAP",
+        "ISIN": "US8030542042",
         "Anteile": 25,
         "Einstand": 131.15,
-        "Währung": "EUR"
+        "Währung": "USD"
     },
 
     {
         "Depot": "Swissquote",
         "Name": "Salesforce",
         "Ticker": "CRM",
+        "ISIN": "US79466L3024",
         "Anteile": 10,
         "Einstand": 238.85,
         "Währung": "USD"
@@ -181,16 +183,18 @@ positionen = [
     {
         "Depot": "Swissquote",
         "Name": "HIVE",
-        "Ticker": "HIVE",
-        "Anteile": 75,
-        "Einstand": 2.00,
-        "Währung": "USD"
+        "Ticker": "YO0.F",
+        "ISIN": "CA4339211035",
+        "Anteile": 15,
+        "Einstand": 2.61,
+        "Währung": "EUR"
     },
 
     {
         "Depot": "Swissquote",
         "Name": "Leclanché",
         "Ticker": "LECN.SW",
+        "ISIN": "CH0110303119",
         "Anteile": 400,
         "Einstand": 1.02,
         "Währung": "CHF"
@@ -200,6 +204,7 @@ positionen = [
         "Depot": "Swissquote",
         "Name": "Leclanché",
         "Ticker": "LECN.SW",
+        "ISIN": "CH0110303119",
         "Anteile": 600,
         "Einstand": 0.14,
         "Währung": "CHF"
@@ -209,6 +214,7 @@ positionen = [
         "Depot": "Swissquote",
         "Name": "Leclanché",
         "Ticker": "LECN.SW",
+        "ISIN": "CH0110303119",
         "Anteile": 500,
         "Einstand": 0.10,
         "Währung": "CHF"
@@ -218,6 +224,7 @@ positionen = [
         "Depot": "Swissquote",
         "Name": "Nvidia",
         "Ticker": "NVDA",
+        "ISIN": "US67066G1040",
         "Anteile": 25,
         "Einstand": 150.76,
         "Währung": "USD"
@@ -245,6 +252,7 @@ positionen = [
         "Depot": "Hypi",
         "Name": "UBS",
         "Ticker": "UBSG.SW",
+        "ISIN": "CH0244767585",
         "Anteile": 100,
         "Einstand": 11.66,
         "Währung": "CHF"
@@ -474,7 +482,7 @@ FINANZEN_URLS = {
     "SAP": ["https://www.finanzen.ch/aktien/sap-aktie"],
     "CRM": ["https://www.finanzen.ch/aktien/salesforce-aktie"],
     "BLDP": ["https://www.finanzen.ch/aktien/ballard_power-aktie"],
-    "HIVE": [
+    "YO0.F": [
         "https://www.finanzen.ch/aktien/hive_digital_technologies-aktie",
         "https://www.finanzen.ch/aktien/hive_blockchain_technologies-aktie",
     ],
@@ -1037,9 +1045,9 @@ def lade_robotics_kurs():
 
 def yahoo_ticker(ticker):
 
-    if ticker == "SAP":
-        return "SAP.DE"
-
+    # Die Ticker in den Positionen entsprechen bereits der gewünschten
+    # Notierung. SAP ist z.B. die US-ADR (USD), HIVE wird als YO0.F
+    # in EUR geführt.
     return ticker
 
 
@@ -1073,6 +1081,20 @@ def lade_kurshistorie(ticker):
     )
 
 
+def _vergleichszeit(zeit):
+
+    if zeit is None:
+        return None
+
+    try:
+        ts = pd.Timestamp(zeit)
+        if ts.tzinfo is not None:
+            ts = ts.tz_convert("Europe/Zurich").tz_localize(None)
+        return ts
+    except Exception:
+        return None
+
+
 def lade_aktuellen_kurs(ticker, waehrung=None):
 
     # Zertifikat: bestehende Speziallogik beibehalten.
@@ -1086,45 +1108,53 @@ def lade_aktuellen_kurs(ticker, waehrung=None):
         return float(serie.iloc[-1]), None, "Finanzen.ch / Zertifikat"
 
 
-    # 1. Primär: finanzen.ch
-    kurs, zeit, kursart = lade_kurs_finanzen(
-        ticker,
-        waehrung
-    )
+    # Beide Quellen abrufen. Finanzen.ch ist grundsätzlich die bevorzugte
+    # Quelle, aber bei US-Titeln kann die dort angezeigte Notierung zeitlich
+    # hinter Yahoo liegen. Darum gewinnt der nachweislich neuere Kurs.
+    f_kurs, f_zeit, _ = lade_kurs_finanzen(ticker, waehrung)
 
-    if not pd.isna(kurs):
-        return kurs, zeit, kursart
-
-
-    # 2. Fallback: yfinance
-    if ticker == "ROG.SW":
-
-        for alternative in [
-            "ROG.SW",
-            "ROP.SW",
-            "RO.SW"
-        ]:
-
-            kurs, zeit, kursart = (
-                lade_aktuellen_kurs_yfinance(
-                    alternative,
-                    waehrung
-                )
-            )
-
-            if not pd.isna(kurs):
-                return kurs, zeit, "Yahoo Fallback"
-
-        return float("nan"), None, "Nicht verfügbar"
-
-
-    kurs, zeit, kursart = lade_aktuellen_kurs_yfinance(
+    y_kurs, y_zeit, y_art = lade_aktuellen_kurs_yfinance(
         yahoo_ticker(ticker),
         waehrung
     )
 
-    if not pd.isna(kurs):
-        return kurs, zeit, "Yahoo Fallback"
+    f_ok = not pd.isna(f_kurs)
+    y_ok = not pd.isna(y_kurs)
+
+    if f_ok and y_ok:
+
+        f_ts = _vergleichszeit(f_zeit)
+        y_ts = _vergleichszeit(y_zeit)
+
+        # Wenn beide Zeitstempel vorhanden sind, den neueren Kurs nehmen.
+        # Bei gleichem Handelstag bleibt Finanzen.ch die Primärquelle.
+        if f_ts is not None and y_ts is not None:
+            if y_ts.date() > f_ts.date():
+                return y_kurs, y_zeit, f"Yahoo ({y_art})"
+            return f_kurs, f_zeit, "Finanzen.ch"
+
+        # Hat nur Yahoo einen Zeitstempel und Finanzen.ch keinen, ist Yahoo
+        # transparenter und wird verwendet.
+        if f_ts is None and y_ts is not None:
+            return y_kurs, y_zeit, f"Yahoo ({y_art})"
+
+        return f_kurs, f_zeit, "Finanzen.ch"
+
+    if f_ok:
+        return f_kurs, f_zeit, "Finanzen.ch"
+
+    if y_ok:
+        return y_kurs, y_zeit, f"Yahoo ({y_art})"
+
+    # Roche-Fallbacks, falls der primäre Yahoo-Ticker ausnahmsweise ausfällt.
+    if ticker == "ROG.SW":
+        for alternative in ["ROP.SW", "RO.SW"]:
+            kurs, zeit, art = lade_aktuellen_kurs_yfinance(
+                alternative,
+                waehrung
+            )
+            if not pd.isna(kurs):
+                return kurs, zeit, f"Yahoo ({art})"
 
     return float("nan"), None, "Nicht verfügbar"
 
