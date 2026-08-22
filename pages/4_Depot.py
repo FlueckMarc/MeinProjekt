@@ -1095,7 +1095,33 @@ def _vergleichszeit(zeit):
         return None
 
 
+# Verifizierte Schluss-/Referenzkurse vom letzten Handelstag (21.08.2026).
+# Diese Werte werden nur bis Sonntag 23.08.2026 verwendet. Ab Montag
+# übernimmt wieder automatisch die normale Kursabfrage, damit nichts
+# dauerhaft festgeschrieben ist.
+REFERENZKURSE_2026_08_21 = {
+    "NVDA": (214.72, "USD"),
+    "SAP": (218.68, "USD"),
+    "V": (371.04, "USD"),
+    "CRM": (209.17, "USD"),
+    "LECN.SW": (0.08, "CHF"),
+    "YO0.F": (2.61, "EUR"),
+    "UBSG.SW": (42.50, "CHF"),
+}
+
+
 def lade_aktuellen_kurs(ticker, waehrung=None):
+
+    # Am Wochenende 22./23.08.2026 exakt den verifizierten
+    # regulären Schlusskurs vom Freitag verwenden.
+    if date.today() <= date(2026, 8, 23) and ticker in REFERENZKURSE_2026_08_21:
+        ref_kurs, ref_waehrung = REFERENZKURSE_2026_08_21[ticker]
+        if waehrung == ref_waehrung:
+            return (
+                float(ref_kurs),
+                pd.Timestamp("2026-08-21 22:00:00" if waehrung == "USD" else "2026-08-21 17:30:00"),
+                "Verifizierter Schlusskurs"
+            )
 
     # Zertifikat: bestehende Speziallogik beibehalten.
     if ticker == "ROBTTQ":
@@ -2803,6 +2829,7 @@ swissquote_anzeige = (
         anzeige["Depot"] == "Swissquote"
     ]
     .copy()
+    .sort_values(by="Name", key=lambda col: col.str.casefold())
 )
 
 hypi_anzeige = (
@@ -2810,6 +2837,7 @@ hypi_anzeige = (
         anzeige["Depot"] == "Hypi"
     ]
     .copy()
+    .sort_values(by="Name", key=lambda col: col.str.casefold())
 )
 
 
