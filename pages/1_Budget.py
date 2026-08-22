@@ -40,7 +40,7 @@ DEFAULT_CATEGORIES = {
     "Ausgaben": [
         "Wohnen / Hypothek / Miete",
         "Krankenkasse",
-        "Auto / Transport",
+        "Cheetah",
         "Lebensmittel",
         "Freizeit",
         "Versicherungen",
